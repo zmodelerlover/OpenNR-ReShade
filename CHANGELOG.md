@@ -1,5 +1,29 @@
 ﻿# Changelog
 
+## v0.7.13 - 2026-10-18 - mochizuki on its new runtime, HIP device matching fallback
+
+Built on v0.7.12 with the same bridge protocol (v6). The danielblnc and lmxxf runtimes are unchanged.
+
+- **mochizuki runs on its new runtime** (the one in OptiScaler's AMD NR fork with the RenoDX stage, NVIDIA's
+  310.9.16 model and int4). The 310.9.16 model is the default, about a third faster than 310.8. The panel shows
+  an **Old model** switch for 310.8 when `dlssnr-amd\` holds both `dlssnr.bin` and `dlssnr-small.bin`, and an
+  **int4 mixed** switch when `dlssnr-int4.bin` and `int4\` are there too; int4 is made from 310.8 and needs ACO,
+  so it takes the old model with it. Either change rebuilds the network. `MochizukiOriginalModel`,
+  `MochizukiInt4` and `MochizukiAco` (on by default) are the `amd-nr.ini` keys; on the 32-bit route only the ini
+  sets them. A runtime from before ACO refuses the flag and the add-on runs it without.
+- **The network runs inside the runtime's RenoDX stage**, which composes the picture itself. Intensity, Colour,
+  Style, Local tone, Structure, Skin, the character mask, Passes and the per-pass profiles go to the stage
+  (`reno_*`); the add-on only puts the finished picture on the frame. On Encoding 0 the frame goes to the runtime
+  as 8-bit sRGB, so the stage takes its SDR codec, as a game's own SDR frame does in the OptiScaler fork, and the
+  answer comes back through the same copy.
+- **Controls that do nothing on mochizuki are hidden**: Compose, Guard, Guard per pass and Output smoothing are
+  neither drawn nor offered in the cascade while mochizuki runs. They stay on danielblnc.
+- **HIP finds its device when the LUIDs disagree.** Some machines report a LUID no D3D12 adapter has (an RX 7600
+  on the DX11 route did), and the network stayed off with "no device matches the D3D12 LUID". The log now lists
+  every device HIP has, with its name, LUID and status, and on a miss takes the one device named like the
+  adapter of the add-on's own D3D12 device, or the only device HIP has, and says which. A failed
+  `hipSetDevice` is logged with its code.
+
 ## v0.7.12 - 2026-10-07 - Hotfix of v0.7.11: Feed.fx motion on still screens, shadow maps as depth, mochizuki's revert
 
 Built on v0.7.11 with the same runtimes and the same bridge protocol (v6).
