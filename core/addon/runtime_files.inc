@@ -312,19 +312,57 @@ bool InitHip()
         return false;
     }
     const auto luid = g.device->GetAdapterLuid();
-    for (int i = 0; i < n; ++i)
+    // R0600 prefix: name[256], uuid[16], luid[8]. Some machines report a LUID no D3D12 adapter has
+    // (an RX 7600 on the DX11 route did), so a miss falls back to the one device named like the
+    // DXGI adapter, or the only device there is, and says so.
+    int byName = -1, named = 0, usable = 0, lastUsable = -1;
+    g.hipDevice = -1;
+    for (int i = 0; i < n && g.hipDevice < 0; ++i)
     {
         alignas(16) std::vector<unsigned char> p(8192, 0);
-        if (props(p.data(), i) == 0 && std::memcmp(p.data() + 272, &luid, 8) == 0)
+        const int code = props(p.data(), i);
+        const char *name = reinterpret_cast<char *>(p.data());
+        p[255] = 0;
+        unsigned long long hipLuid = 0;
+        std::memcpy(&hipLuid, p.data() + 272, 8);
+        Log("HIP: device %d code %d \"%s\" LUID %08llX:%08llX", i, code, name, hipLuid >> 32,
+            hipLuid & 0xffffffffull);
+        if (code != 0)
+            continue;
+        ++usable;
+        lastUsable = i;
+        if (std::memcmp(p.data() + 272, &luid, 8) == 0)
         {
             g.hipDevice = i;
-            Log("HIP: adapter %s matches the game's D3D12 device.", reinterpret_cast<char *>(p.data()));
-            break;
+            Log("HIP: adapter %s matches the game's D3D12 device.", name);
+        }
+        else if (g.adapterName[0] != 0 && std::strcmp(name, g.adapterName) == 0)
+        {
+            byName = i;
+            ++named;
         }
     }
-    if (g.hipDevice < 0 || g.hipSet(g.hipDevice) != 0)
+    if (g.hipDevice < 0 && named == 1)
     {
-        Log("HIP: no device matches the D3D12 LUID.");
+        g.hipDevice = byName;
+        Log("HIP: no LUID match; using device %d, the only one named %s.", byName, g.adapterName);
+    }
+    else if (g.hipDevice < 0 && usable == 1)
+    {
+        g.hipDevice = lastUsable;
+        Log("HIP: no LUID match; using device %d, the only one HIP has.", lastUsable);
+    }
+    if (g.hipDevice < 0)
+    {
+        Log("HIP: no device matches the D3D12 LUID %08lX:%08lX.", static_cast<unsigned long>(luid.HighPart),
+            luid.LowPart);
+        g.hipSet = nullptr;
+        return false;
+    }
+    if (const int code = g.hipSet(g.hipDevice); code != 0)
+    {
+        Log("HIP: hipSetDevice(%d) failed with %d.", g.hipDevice, code);
+        g.hipDevice = -1;
         g.hipSet = nullptr;
         return false;
     }

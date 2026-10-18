@@ -837,6 +837,7 @@ struct State
     bool loggedPassDetail = false;
     HipSetFn hipSet = nullptr;
     int hipDevice = -1;
+    char adapterName[128] {};  // DXGI's description of the work device's adapter; InitHip's fallback
     bool engineReady = false;
 
     ComPtr<ID3D12RootSignature> root;
@@ -1451,6 +1452,7 @@ bool CreateWorkDevice(IDXGIAdapter *adapter, LUID luid)
 
     char name[128] {};
     WideCharToMultiByte(CP_UTF8, 0, ad.Description, -1, name, sizeof(name) - 1, nullptr, nullptr);
+    memcpy(g.adapterName, name, sizeof(g.adapterName));
     const LUID got = g.bridge.workDevice->GetAdapterLuid();
     Log("bridge: own D3D12 device on %s (vendor %04X). LUID game %08lX:%08lX, ours %08lX:%08lX -> "
         "%s adapter.", name, ad.VendorId, static_cast<unsigned long>(luid.HighPart),
