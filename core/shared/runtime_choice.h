@@ -45,7 +45,8 @@ inline bool Installed(const std::filesystem::path& dir, int runtime) {
     std::error_code ec;
     if (runtime == kMochizuki)
         return std::filesystem::exists(dir / L"MochizukiNrRuntime.dll", ec) &&
-               std::filesystem::exists(dir / L"dlssnr-amd" / L"dlssnr.bin", ec);
+               (std::filesystem::exists(dir / L"dlssnr-amd" / L"dlssnr.bin", ec) ||
+                std::filesystem::exists(dir / L"dlssnr-amd" / L"dlssnr-small.bin", ec));
     return std::filesystem::exists(dir / L"dlssnr_amd_pass1.dll", ec);
 }
 

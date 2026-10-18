@@ -1,8 +1,9 @@
 # The mochizuki runtime's C ABI, vendored
 
 `LmxxfNrApi.h` and `MochizukiNrControls.h`, copied unmodified from the OptiScaler AMD NR fork
-(<https://github.com/MatheusFerreiraS/neural-amd-opti>, branch `dlss-neural-rendering`, commit
-`0ae1a2ec`): `OptiScaler/dlssnr/backend/lmxxf_runtime/LmxxfNrApi.h` and
+(<https://github.com/MatheusFerreiraS/neural-amd-opti>, branch `dlss-neural-rendering`, after
+commit `b019c9e2b`, the ABI of the runtime with the RenoDX stage, the 310.9.16 model and int4):
+`OptiScaler/dlssnr/backend/lmxxf_runtime/LmxxfNrApi.h` and
 `OptiScaler/dlssnr/backend/mochizuki_runtime/MochizukiNrControls.h`.
 
 They describe `MochizukiNrRuntime.dll`, which runs mochizuki0323's Vulkan port of the network

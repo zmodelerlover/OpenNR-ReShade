@@ -90,9 +90,41 @@ void StatusColumn(const PanelStatus &status)
                       "Escala e ponha Passes em 1."));
 }
 
+// mochizuki's network, when its folder has a choice: the model, and int4 mixed, which is made from the
+// 310.8 model and so takes it along. Either rebuilds the network.
+void MochizukiModel(PanelSettings &s, const PanelStatus &status)
+{
+    const bool int4 = (status.mochizukiModels & 2u) != 0 && s.mzInt4 != 0;
+    if ((status.mochizukiModels & 1u) != 0)
+    {
+        ImGui::BeginDisabled(int4);
+        bool old = s.mzOriginalModel != 0 || int4;
+        if (ImGui::Checkbox(T("Old model", "Modelo antigo"), &old))
+            s.mzOriginalModel = old ? 1u : 0u;
+        ImGui::EndDisabled();
+        Help("NVIDIA's 310.8 model instead of 310.9's, which is the default: 310.9 is about a third faster and "
+             "answers a little differently. int4 mixed ticks this, since it is made from 310.8. A change rebuilds "
+             "the network.",
+             "O modelo 310.8 da NVIDIA em vez do 310.9, que é o padrão: o 310.9 é cerca de um terço mais rápido e "
+             "responde um pouco diferente. O int4 misto marca isto, porque é feito do 310.8. Mudar reconstrói a "
+             "rede.");
+    }
+    if ((status.mochizukiModels & 2u) == 0)
+        return;
+    bool mixed = s.mzInt4 != 0;
+    if (ImGui::Checkbox(T("int4 mixed", "int4 misto"), &mixed))
+        s.mzInt4 = mixed ? 1u : 0u;
+    Help("Part of the 310.8 network in 4-bit weights: faster, the picture slightly different. It needs ACO "
+         "(dlssnr-amd\\aco\\ and a driver with pipeline binaries); without it the default network runs and "
+         "mochizuki_nr.log says why. A change rebuilds the network.",
+         "Parte da rede 310.8 com pesos de 4 bits: mais rápida, a imagem um pouco diferente. Precisa do ACO "
+         "(dlssnr-amd\\aco\\ e um driver com pipeline binaries); sem ele roda a rede padrão e o "
+         "mochizuki_nr.log diz por quê. Mudar reconstrói a rede.");
+}
+
 // The runtime is taken when the network first starts, so a pick here is written to amd-nr.ini and
 // applies on the next launch.
-void Runtime(const PanelStatus &status, PanelActions &actions)
+void Runtime(PanelSettings &s, const PanelStatus &status, PanelActions &actions)
 {
     int chosen = status.runtimeChosen;
     if (ImGui::Combo(T("NR runtime", "Runtime da rede"), &chosen,
@@ -119,6 +151,8 @@ void Runtime(const PanelStatus &status, PanelActions &actions)
         Note(kWarn, T("Not installed in this game's folder.", "Não está instalado na pasta deste jogo."));
     else if (status.runtimeActive >= 0 && chosen != status.runtimeActive)
         Note(kWarn, T("Restart the game to switch.", "Reinicie o jogo para trocar."));
+    if (status.mochizuki != 0)
+        MochizukiModel(s, status);
 }
 
 } // namespace
@@ -132,7 +166,7 @@ void DrawGeneral(PanelSettings &s, const PanelStatus &status, PanelActions &acti
     if (ImGui::Combo(T("Language", "Idioma"), &lang, "English\0Português\0"))
         s.language = lang;
     StatusColumn(status);
-    Runtime(status, actions);
+    Runtime(s, status, actions);
 }
 
 } // namespace ui

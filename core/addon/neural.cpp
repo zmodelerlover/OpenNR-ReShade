@@ -755,6 +755,9 @@ struct State
         std::atomic<float> passTone[kMaxPasses] {};
         std::atomic<float> passSkin[kMaxPasses] {};
         std::atomic<bool> useFeedEffect { true };
+        // mochizuki's network (mochizuki.inc, MzFrameFlags): the 310.8 model instead of 310.9's, int4 mixed, and
+        // ACO's machine code, which int4 needs. Off the bridge's wire, like FeedEffect.
+        std::atomic<bool> mzOriginalModel { false }, mzInt4 { false }, mzAco { true };
         // OpenGL only, and read-only from the ini like the rest of that family. The route hands over
         // between the two APIs with the imported D3D12 fences when the driver has them; setting this
         // to 0 puts it back on the CPU stall the other routes use, which is the only way to compare
@@ -1232,6 +1235,9 @@ void LoadSettings()
     if (!g.settings.inlineMode.load())
         Log("Inline=0: the engine runs async, so the game's queue does not wait for the network");
     g.settings.useFeedEffect.store(flag(L"FeedEffect", g.settings.useFeedEffect.load()));
+    g.settings.mzOriginalModel.store(flag(L"MochizukiOriginalModel", g.settings.mzOriginalModel.load()));
+    g.settings.mzInt4.store(flag(L"MochizukiInt4", g.settings.mzInt4.load()));
+    g.settings.mzAco.store(flag(L"MochizukiAco", g.settings.mzAco.load()));
     g.noBackBuffer.store(flag(L"NoBackBuffer", g.noBackBuffer.load()));
     g.noBridge.store(flag(L"NoBridge", g.noBridge.load()));
     g.settings.glSemaphores.store(flag(L"GlSemaphores", g.settings.glSemaphores.load()));
@@ -1330,6 +1336,8 @@ void ForEachSetting(Num num, Flag flag)
         num(key, g.settings.passSkin[i].load());
     }
     flag(L"FeedEffect", g.settings.useFeedEffect.load());
+    flag(L"MochizukiOriginalModel", g.settings.mzOriginalModel.load());
+    flag(L"MochizukiInt4", g.settings.mzInt4.load());
     // Stage / Events / NoBridge / NoBackBuffer are deliberately not written back. They are
     // startup diagnostics, they cannot take effect live, and rewriting them here would quietly
     // re-save a one-off value that was meant for a single run.
@@ -2858,18 +2866,22 @@ bool RecordNetwork(ID3D12GraphicsCommandList *&cmd, ID3D12Resource *colourSrc,
     // intensity makes every step of the composition the identity, additive or ratio alike. A debug
     // view is exempt for the reason CompositionIsFresh gives: what it draws is a buffer.
     const bool stale = !(runNetwork && g.activePasses != 0) && dbg == 0 && !g.settings.networkOutput.load();
-    const float composeStrength = stale ? 0.0f : strength;
+    // mochizuki's RenoDX stage hands back a finished picture with Intensity and Colour already in it:
+    // additive at full strength, unbounded, puts exactly that on the frame. A debug view keeps its own.
+    const bool finished = MzSelected() && dbg == 0;
+    const float composeStrength = stale ? 0.0f : finished ? 1.0f : strength;
     // v0.6.0's packing, untouched: bit 0 is the filter and everything above it is the debug view.
     UINT cdims[12] { w, h, nw, nh, static_cast<UINT>(encMode), 0, 0,
                      (g.settings.bicubic.load() ? 1u : 0u) | (static_cast<UINT>(dbg) << 1),
                      0, 0, 0, 0 };
     std::memcpy(&cdims[5], &kWhite, sizeof(float));
     std::memcpy(&cdims[6], &composeStrength, sizeof(float));
-    const float rlimit = g.settings.residualLimit.load(), rfade = g.settings.residualFade.load();
+    const float rlimit = finished ? 0.0f : g.settings.residualLimit.load();
+    const float rfade = finished ? 0.0f : g.settings.residualFade.load();
     std::memcpy(&cdims[8], &rlimit, sizeof(float));
     std::memcpy(&cdims[9], &rfade, sizeof(float));
     const float cstrength = g.settings.colourStrength.load();
-    const float guardEff = EffectiveGuard();
+    const float guardEff = finished ? 0.0f : EffectiveGuard();
     std::memcpy(&cdims[10], &cstrength, sizeof(float));
     std::memcpy(&cdims[11], &guardEff, sizeof(float));
     cmd->SetComputeRoot32BitConstants(1, 12, cdims, 0);

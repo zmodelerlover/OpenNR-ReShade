@@ -48,7 +48,10 @@ uint32_t AvailableOpts(const PanelStatus &status)
     const uint32_t lacks = (status.hasFeedEffect ? 0u : kOptFeed) |
                            (status.hasGameGuides ? 0u : kOptGameGuides) |
                            (status.hasDepth ? 0u : kOptDepth | kOptDepthInv | kOptDepthStretch) |
-                           (status.hasQuality ? 0u : kOptQuality);
+                           (status.hasQuality ? 0u : kOptQuality) |
+                           // mochizuki's RenoDX stage composes the picture itself, and the smoothing is
+                           // danielblnc's: the add-on's own composition bounds would act on nothing.
+                           (status.mochizuki != 0 ? kOptCompose | kOptGuard | kOptGuardPerPass | kOptSmooth : 0u);
     uint32_t bits = 0;
     for (int i = 0; i < kOptCount; ++i)
         if ((kOpts[i].bit & lacks) == 0)

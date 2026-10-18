@@ -5,9 +5,11 @@
 // It runs on a Vulkan device of its own on the same GPU and reaches our D3D12 device through
 // shared buffers and a shared fence. The list is cut in two around it: the inputs are copied out,
 // the first half is submitted, the runtime queues the network between the halves on our queue,
-// and the second half copies the answer back into netColour. From there on the frame is the one
-// the danielblnc runtime leaves: residual, compose and measurement read netColour as before.
-// Passes and temporal history live inside the runtime, so none of the per-module copies apply.
+// and the second half copies the answer back into netColour. The network runs inside the
+// runtime's RenoDX stage, which composes the picture itself, so netColour comes back finished:
+// RecordNetwork's compose only puts it on the frame, with nothing of its own, and Intensity, Colour
+// and the model's controls go to the stage. Passes and temporal history live inside the runtime,
+// so none of the per-module copies apply.
 //
 // Included inside neural.cpp's anonymous namespace, after TuningFor.
 
@@ -39,6 +41,10 @@ struct Mochizuki {
     uint32_t builtW = 0, builtH = 0, builtPasses = 0;
     ULONGLONG refusedSince = 0;
     std::string refusal, reverted;
+    uint32_t models = 0; // PanelStatus::mochizukiModels, looked at once with the rest of the folder
+    // Encoding 0: the frame as 8-bit sRGB for the runtime (MzToSdr), and the copy shader both ways.
+    ComPtr<ID3D12Resource> sdr;
+    ComPtr<ID3D12PipelineState> convert;
 };
 // Never destroyed, like g: its session and module outlive anything that could run at exit.
 Mochizuki &mz = *new Mochizuki;
@@ -53,6 +59,13 @@ bool MzSelected() {
         mz.selected =
             mz.chosen == runtime_choice::kMochizuki && mz.installed[runtime_choice::kMochizuki] ? 1
                                                                                                 : 0;
+        std::error_code ec;
+        const auto models = ExeDirectory() / L"dlssnr-amd";
+        const auto has = [&](const wchar_t* name) {
+            return std::filesystem::exists(models / name, ec);
+        };
+        mz.models = (has(L"dlssnr.bin") && has(L"dlssnr-small.bin") ? 1u : 0u) |
+                    (has(L"dlssnr-int4.bin") && has(L"int4") ? 2u : 0u);
         if (mz.selected == 1 && runtime_choice::MochizukiBuildDied(ExeDirectory())) {
             mz.selected = 0;
             mz.chosen = runtime_choice::kDanielblnc;
@@ -65,7 +78,7 @@ bool MzSelected() {
         } else if (mz.selected == 1)
             Log("runtime: mochizuki (NrBackend=mochizuki in amd-nr.ini, or no NrBackend and mochizuki installed)");
         else if (mz.chosen == runtime_choice::kMochizuki)
-            Log("runtime: amd-nr.ini names mochizuki, but MochizukiNrRuntime.dll or dlssnr-amd\\dlssnr.bin "
+            Log("runtime: amd-nr.ini names mochizuki, but MochizukiNrRuntime.dll or a model in dlssnr-amd\\ "
                 "is not here; running danielblnc");
     }
     return mz.selected == 1;
@@ -144,10 +157,19 @@ bool MzInit() {
         mz.sentValid = false;
     }
     const std::wstring dir = ExeDirectory().wstring();
+    // ACO's machine code where dlssnr-amd\aco\ and the driver have it, as the OptiScaler fork runs it; the
+    // runtime takes it once a process. A runtime from before ACO refuses the flag, and runs without it.
     LmxxfNrCreateInfo ci{sizeof ci, g.device.Get(), g.queue.Get(), dir.c_str(),
-                         LMXXF_NR_CREATE_FLAG_ZERO_OUTPUT_FALLBACK};
+                         LMXXF_NR_CREATE_FLAG_ZERO_OUTPUT_FALLBACK |
+                             (g.settings.mzAco.load() ? LMXXF_NR_CREATE_FLAG_ACO : 0u)};
     void* s = nullptr;
-    if (mz.api.Create(&ci, &s) != LMXXF_NR_OK)
+    int32_t created = mz.api.Create(&ci, &s);
+    if (created == LMXXF_NR_INVALID_ARGUMENT && (ci.flags & LMXXF_NR_CREATE_FLAG_ACO) != 0) {
+        Log("mochizuki: this MochizukiNrRuntime.dll has no ACO; running without it");
+        ci.flags &= ~LMXXF_NR_CREATE_FLAG_ACO;
+        created = mz.api.Create(&ci, &s);
+    }
+    if (created != LMXXF_NR_OK)
         return MzOff("Create");
     // The runtime makes its own Vulkan instance here. ReShade's Vulkan layer, when it is installed
     // system-wide, would wrap that instance as if it were a game's and report its device to every
@@ -174,10 +196,11 @@ bool MzInit() {
 }
 
 // The model's controls, from the same settings the danielblnc runtime reads: it is the same
-// network, so Structure, Tone, Skin, the character mask and the per-pass profiles mean the same.
-// Style goes to the network as on danielblnc. Intensity, the limit and colour strength stay in compose, so the runtime's own detail
-// and colour strengths stay at 1. The OptiScaler host sends colour 0 instead; on the framecheck
-// frame Colour Strength 0 in compose gives the same mean change to 0.0001. Sent only on a change.
+// network, so Structure, Tone, Skin, Style, the character mask and the per-pass profiles mean the
+// same. They go to the runtime's RenoDX stage (reno_*), which the runtime always runs and which
+// composes the picture itself, so Intensity and Colour go there too; the stage's other settings stay
+// at the runtime's defaults, as the OptiScaler fork leaves them. A runtime from before the stage reads
+// only the struct's front: the old fields are filled as before. Sent only on a change.
 void MzSendControls() {
     if (mz.setControls == nullptr)
         return;
@@ -202,6 +225,43 @@ void MzSendControls() {
         p.skin_structure = t.skin;
         p.automatic_mask = c.automatic_mask;
     }
+    const float intensity = std::clamp(g.settings.intensity.load(), 0.0f, 2.0f);
+    c.renodx = 1;
+    c.reno_nr_enabled = 1;
+    c.reno_intensity = intensity;
+    c.reno_style = c.style;
+    c.reno_local_tone = std::clamp(first.tone, 0.0f, 2.0f);
+    c.reno_local_structure = std::clamp(first.structure, 0.0f, 2.0f);
+    c.reno_skin_structure = std::clamp(first.skin, -1.0f, 1.0f);
+    c.reno_auto_mask = c.automatic_mask;
+    c.reno_passes = static_cast<uint32_t>(std::clamp(g.settings.passes.load(), 1, 3));
+    c.reno_color_strength = std::clamp(g.settings.colourStrength.load(), 0.0f, 1.0f);
+    // On Encoding 0 the frame arrives as 8-bit sRGB (MzToSdr); said outright all the same.
+    c.reno_source_encoding = g.settings.encoding.load() == 0 ? 1u : 2u;
+    // A later pass follows pass 1 unless it has a profile of its own (or the taper gives it one). Pass 1's
+    // Local tone is then the stage's on every pass, as RenoDX does it, where danielblnc gives later ones 0.
+    struct Pass {
+        uint32_t *follow, *style, *mask;
+        float *intensity, *tone, *structure, *skin;
+    } later[] = {
+        {&c.reno_pass_follow_0, &c.reno_pass_style_0, &c.reno_pass_auto_mask_0,
+         &c.reno_pass_intensity_0, &c.reno_pass_local_tone_0, &c.reno_pass_local_structure_0,
+         &c.reno_pass_skin_structure_0},
+        {&c.reno_pass_follow_1, &c.reno_pass_style_1, &c.reno_pass_auto_mask_1,
+         &c.reno_pass_intensity_1, &c.reno_pass_local_tone_1, &c.reno_pass_local_structure_1,
+         &c.reno_pass_skin_structure_1},
+    };
+    for (UINT i = 1; i < State::kMaxPasses && i <= std::size(later); ++i) {
+        const PassTune t = TuningFor(i);
+        const Pass& p = later[i - 1];
+        *p.follow = g.settings.passOverride[i].load() || g.settings.passTaper.load() ? 0u : 1u;
+        *p.style = c.style;
+        *p.mask = c.automatic_mask;
+        *p.intensity = intensity;
+        *p.tone = std::clamp(t.tone, 0.0f, 2.0f);
+        *p.structure = std::clamp(t.structure, 0.0f, 2.0f);
+        *p.skin = std::clamp(t.skin, -1.0f, 1.0f);
+    }
     if (mz.sentValid && std::memcmp(&c, &mz.sent, sizeof c) == 0)
         return;
     if (mz.setControls(mz.session, &c) != LMXXF_NR_OK) {
@@ -210,11 +270,23 @@ void MzSendControls() {
     }
     mz.sent = c;
     mz.sentValid = true;
-    Log("mochizuki: controls style %u, structure %.2f, tone %.2f, skin %.2f, mask %u, linear input %s",
-        c.style, static_cast<double>(c.local_structure), static_cast<double>(c.local_tone),
-        static_cast<double>(c.skin_structure), c.automatic_mask,
-        c.linear_input == 1 ? "on" : "off");
+    Log("mochizuki: controls style %u, intensity %.2f, colour %.2f, structure %.2f, tone %.2f, skin %.2f, mask %u, "
+        "passes %u, source %s",
+        c.reno_style, static_cast<double>(c.reno_intensity),
+        static_cast<double>(c.reno_color_strength), static_cast<double>(c.reno_local_structure),
+        static_cast<double>(c.reno_local_tone), static_cast<double>(c.reno_skin_structure),
+        c.reno_auto_mask, c.reno_passes, c.reno_source_encoding == 1 ? "SDR" : "linear");
 }
+
+// The network the frames ask for: int4 mixed runs as ACO's machine code only and is made from the 310.8
+// model, so it takes that model with it, as the OptiScaler fork's menu does. A change rebuilds the network.
+uint32_t MzFrameFlags() {
+    const bool int4 = g.settings.mzInt4.load() && g.settings.mzAco.load();
+    return (int4 ? LMXXF_NR_FRAME_FLAG_INT4 : 0u) |
+           (int4 || g.settings.mzOriginalModel.load() ? LMXXF_NR_FRAME_FLAG_ORIGINAL_MODEL : 0u);
+}
+
+#include "mochizuki_sdr.inc"
 
 // PrepareFrame refused a frame. While a network builds that is the build; with none under way the
 // runtime has turned the network down -- a Scale or Passes change it freed the old network for and then
@@ -274,7 +346,12 @@ bool MzRecord(ID3D12GraphicsCommandList*& cmd, bool haveMotion, UINT passes,
     fi.command_list = cmd;
     fi.color_width = g.netWidth;
     fi.color_height = g.netHeight;
-    fi.color = g.netColour.Get();
+    ID3D12Resource* colour = g.settings.encoding.load() == 0 ? MzToSdr(cmd) : g.netColour.Get();
+    if (colour == nullptr) {
+        MzSay("no 8-bit copy of the frame");
+        return true;
+    }
+    fi.color = colour;
     fi.color_state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     fi.model_scale = 1.0f;
     fi.passes = passes;
@@ -287,8 +364,10 @@ bool MzRecord(ID3D12GraphicsCommandList*& cmd, bool haveMotion, UINT passes,
         fi.motion_scale_x = 1.0f;
         fi.motion_scale_y = 1.0f;
     }
+    fi.flags |= MzFrameFlags();
     fi.reset = (g.historyValid.load() & 1u) == 0 ? 1u : 0u;
-    LmxxfNrJob job{sizeof job, nullptr, nullptr};
+    // Without first_pass_output: no person protection here, and a runtime from before it takes only this size.
+    LmxxfNrJob job{offsetof(LmxxfNrJob, first_pass_output), nullptr, nullptr};
     if (mz.api.PrepareFrame(mz.session, &fi, &job) != LMXXF_NR_OK) {
         MzSay("frame without the network");
         MzRefused();
@@ -313,15 +392,19 @@ bool MzRecord(ID3D12GraphicsCommandList*& cmd, bool haveMotion, UINT passes,
         return true;
     }
     auto* result = static_cast<ID3D12Resource*>(job.private_output);
-    Barrier(cmd, result, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-            D3D12_RESOURCE_STATE_COPY_SOURCE);
-    Barrier(cmd, g.netColour.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-            D3D12_RESOURCE_STATE_COPY_DEST);
-    cmd->CopyResource(g.netColour.Get(), result);
-    Barrier(cmd, g.netColour.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    Barrier(cmd, result, D3D12_RESOURCE_STATE_COPY_SOURCE,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    if (colour != g.netColour.Get()) {
+        MzConvert(cmd, 52, result, g.netColour.Get());
+    } else {
+        Barrier(cmd, result, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                D3D12_RESOURCE_STATE_COPY_SOURCE);
+        Barrier(cmd, g.netColour.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                D3D12_RESOURCE_STATE_COPY_DEST);
+        cmd->CopyResource(g.netColour.Get(), result);
+        Barrier(cmd, g.netColour.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        Barrier(cmd, result, D3D12_RESOURCE_STATE_COPY_SOURCE,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    }
     mz.lastJob = job.handle;
     const bool resumed = !mz.said.empty();  // the first frame run after frames without the network
     if (resumed) {
@@ -370,6 +453,7 @@ void MzStatus(PanelStatus& st) {
     if (!selected)
         return;
     st.mochizuki = 1;
+    st.mochizukiModels = mz.models;
     // A revert is news until Scale or Passes moves again.
     if (g.settings.scale.load() != mz.goodScale || g.settings.passes.load() != mz.goodPasses)
         mz.reverted.clear();

@@ -435,6 +435,29 @@ void QualityRow() {
     g_hover = false;
 }
 
+// On mochizuki the RenoDX stage composes the picture, so the add-on's composition rows and the smoothing are
+// neither drawn nor offered; the model switches are drawn when the folder holds the files for them.
+void MochizukiRows() {
+    ui::PanelStatus st = Status64();
+    ui::PanelSettings s = Base();
+    s.optional = ui::kOptAll;
+    const char* stageRows[] = {"w:Compose", "w:Guard", "w:Guard per pass", "w:Output smoothing"};
+    for (const char* row : stageRows)
+        CHECK(Draw(s, st).count(row), "danielblnc: '%s' missing", row);
+    CHECK(!Draw(s, st).count("w:Old model"), "Old model drawn on danielblnc");
+    st.mochizuki = 2;
+    for (const char* row : stageRows)
+        CHECK(!Draw(s, st).count(row), "mochizuki: '%s' drawn", row);
+    CHECK(!(ui::AvailableOpts(st) & (ui::kOptCompose | ui::kOptGuard | ui::kOptGuardPerPass | ui::kOptSmooth)),
+          "the cascade offers composition rows on mochizuki");
+    CHECK(Draw(s, st).count("w:Intensity") && Draw(s, st).count("w:Local tone"),
+          "mochizuki lost Intensity or Local tone");
+    CHECK(!Draw(s, st).count("w:Old model") && !Draw(s, st).count("w:int4 mixed"),
+          "model switches drawn without the files");
+    st.mochizukiModels = 3;
+    CHECK(Draw(s, st).count("w:Old model") && Draw(s, st).count("w:int4 mixed"), "model switches missing");
+}
+
 } // namespace
 
 int main() {
@@ -453,6 +476,7 @@ int main() {
     RouteCaps();
     RuntimeLine();
     QualityRow();
+    MochizukiRows();
     if (g_failures) {
         std::printf("panel_check: %d failure(s)\n", g_failures);
         return 1;

@@ -58,7 +58,7 @@ extern "C"
         float white_point;       /* 0.01..100, default 1; linear input only */
         uint32_t apply_model;    /* default 1; 0 runs the network at full cost and shows the original */
         uint32_t linear_input;   /* 0 auto (float formats are linear, default), 1 on, 2 off; rebuilds the network */
-        uint32_t max_passes;     /* 0 (default): the frame's passes; else 1..3, at least the frame's; rebuilds */
+        uint32_t max_passes;     /* 0 (default): the frame's passes; else 1..30, at least the frame's; rebuilds */
         /* Dynamic resolution. 0 exact (the default here and in a zeroed struct): the network is built for the
          * frame's render subrect, so every change of it rebuilds. 1 auto (the host's default, through
          * MochizukiDynamicResolution): as exact until a subrect smaller than the colour texture comes, then a
@@ -69,6 +69,115 @@ extern "C"
         uint32_t drs_mode;
         uint32_t reserved[3];
         MochizukiNrPassControls pass[2]; /* passes 2 and 3 */
+        /* Preprocess (mochizuki0323's 729a05d): the picture the network is shown is changed before it runs and every
+         * change is taken back out of its answer, so it changes how the network edits the frame. 0 (the default)
+         * records nothing; the first frame with it on rebuilds the network once, able to run it. */
+        uint32_t preprocess;
+        uint32_t preprocess_exposure; /* 0 off, 1 auto (default: histogram auto exposure), 2 fixed: bias alone */
+        float preprocess_bias_ev;     /* -8..8, default 0 */
+        uint32_t preprocess_curve;    /* 0 none, 1 neutral, 2 reinhard, 3 filmic (default), 4 gt, 5 aces, 6 agx */
+        float preprocess_contrast;    /* about mid grey, 0.5..2, default 1 */
+        float preprocess_saturation;  /* 0.05..2, default 1 */
+        /* With LMXXF_NR_FRAME_FLAG_ANTI_HALO: how far past the first pass's local range a pixel may go, as a
+         * fraction of it: 0..0.5, default 0.05 (also for a host whose struct ends before it). */
+        float anti_halo_margin;
+        /* Below 100% model scale, how the model's result is enlarged to the frame: 0 matched residual (default),
+         * 1 edge-aware, 2 classic. Per frame, no rebuild. */
+        uint32_t enlarge_mode;
+        uint32_t classic_scaler;    /* with enlarge_mode 2: 0 bilinear, 1 Catmull-Rom (default), 2 Lanczos3, 3 FSR1 */
+        uint32_t noise_every_frame; /* frames without motion vectors: the noise seed moves every frame; default 0 */
+        /* Upstream's RenoDX stage: the network inside RenoDX's encode and composition, with the reno_* controls
+         * below in place of the model controls above, whose passes, detail and colour strength, model scale, highlight
+         * guard, white point, enlargement and pass extras it does not use. Default 1 (OptiScaler always sends 1);
+         * 0 runs the network on its own, as before the stage. A change rebuilds the network. */
+        uint32_t renodx;
+        /* MochizukiRenoOptions.inc, in this order: RenoDX's own settings, sanitised to its ranges. Passes past 4
+         * take pass 4's controls (reno_pass_*_2). */
+        uint32_t reno_nr_enabled;
+        float reno_intensity;
+        uint32_t reno_style;
+        float reno_local_tone;
+        float reno_local_structure;
+        float reno_skin_structure;
+        uint32_t reno_auto_mask;
+        uint32_t reno_skin_independent;
+        uint32_t reno_passes;
+        uint32_t reno_unlock_passes;
+        uint32_t reno_chained_history;
+        float reno_pass_transfer_0;
+        float reno_pass_color_0;
+        float reno_pass_intensity_0;
+        uint32_t reno_pass_follow_0;
+        uint32_t reno_pass_style_0;
+        float reno_pass_local_tone_0;
+        float reno_pass_local_structure_0;
+        float reno_pass_skin_structure_0;
+        uint32_t reno_pass_auto_mask_0;
+        float reno_pass_transfer_1;
+        float reno_pass_color_1;
+        float reno_pass_intensity_1;
+        uint32_t reno_pass_follow_1;
+        uint32_t reno_pass_style_1;
+        float reno_pass_local_tone_1;
+        float reno_pass_local_structure_1;
+        float reno_pass_skin_structure_1;
+        uint32_t reno_pass_auto_mask_1;
+        float reno_pass_transfer_2;
+        float reno_pass_color_2;
+        float reno_pass_intensity_2;
+        uint32_t reno_pass_follow_2;
+        uint32_t reno_pass_style_2;
+        float reno_pass_local_tone_2;
+        float reno_pass_local_structure_2;
+        float reno_pass_skin_structure_2;
+        uint32_t reno_pass_auto_mask_2;
+        float reno_color_strength;
+        float reno_transfer_strength;
+        float reno_chroma_clamp_stops;
+        uint32_t reno_transfer_mode;
+        float reno_style_highlight_guard;
+        uint32_t reno_detail_stability;
+        float reno_resolution_scale;
+        uint32_t reno_follow_input_res;
+        uint32_t reno_look_upsample;
+        uint32_t reno_look_mode;
+        float reno_look_strength;
+        float reno_look_brighten;
+        float reno_look_darken;
+        float reno_look_colour;
+        float reno_look_hue;
+        float reno_look_shadows;
+        float reno_look_midtones;
+        float reno_look_highlights;
+        float reno_look_max_brighten;
+        float reno_look_max_darken;
+        float reno_look_max_colour;
+        float reno_look_tone;
+        float reno_look_detail;
+        float reno_look_detail_radius;
+        float reno_look_halo;
+        float reno_look_halo_bright;
+        uint32_t reno_look_stabilize;
+        float reno_look_stabilize_ms;
+        uint32_t reno_look_stabilize_detail;
+        uint32_t reno_sdr_black_restore;
+        uint32_t reno_display_pedestal;
+        uint32_t reno_codec_mode;
+        uint32_t reno_neural_floor_guard;
+        uint32_t reno_source_encoding;
+        float reno_linear_unit_nits;
+        float reno_proxy_anchor_nits;
+        float reno_paper_white_scale;
+        float reno_diffuse_white_nits;
+        float reno_pq_calibration;
+        uint32_t reno_feed_mode;
+        uint32_t reno_norm_governor;
+        uint32_t reno_norm_cut_aware;
+        float reno_norm_attack_stops;
+        float reno_norm_release_stops;
+        float reno_norm_slew_stops;
+        float reno_mvec_scale_x;
+        float reno_mvec_scale_y;
     } MochizukiNrControls;
 
     /* What the session is doing, for a menu. Safe to ask from any thread, at any rate. */
@@ -89,7 +198,14 @@ extern "C"
         uint32_t failed;               /* 1: the session failed; last_error says why */
         char last_error[256];
         uint32_t network_dispatches; /* the network's dispatches in the last frame (all passes) */
-        /* The fields end at byte 324 (struct_size as the runtime fills it); sizeof is 328 (tail padding). */
+        float preprocess_ev;         /* the preprocess's auto exposure in EV, bias included; NaN when not metering */
+        float white_point; /* the white point the last frame used, the game's exposure applied (linear colour) */
+        /* While building: 1 planning, 2 reading the weights, 3 uploading them, 4 making the pipelines (build_done of
+           build_total), 5 finishing; 0 otherwise. */
+        uint32_t build_stage;
+        uint32_t build_done, build_total;
+        uint32_t renodx_effective; /* 1: the network the frames run on is the RenoDX stage's */
+        /* The fields end at byte 348 (struct_size as the runtime fills it); sizeof has 4 bytes of tail padding. */
     } MochizukiNrInfo;
 
     /* All but GetFeatures return an LmxxfNrStatus. SetControls takes effect on the next PrepareFrame; call it on the
@@ -98,6 +214,12 @@ extern "C"
     typedef int32_t (*PFN_MochizukiNrGetInfo)(void* context, MochizukiNrInfo* info);
     typedef int32_t (*PFN_MochizukiNrGetControlDefaults)(MochizukiNrControls* controls);
     typedef uint32_t (*PFN_MochizukiNrGetFeatures)(void);
+    /* The game's exposure for the frames that follow: what the frame's linear colour is multiplied by to be shown
+     * (the upscaler's exposure texture, times its scale, over the pre-exposure). The white point becomes
+     * MochizukiNrControls::white_point divided by it, so the network sees the frame at the brightness the game shows
+     * it. 0, or a value that is not finite and positive, goes back to white_point alone. Call it before PrepareFrame
+     * on the thread that calls it; it never fails the session. */
+    typedef int32_t (*PFN_MochizukiNrSetExposure)(void* context, float exposure);
 
 #ifdef _WIN32
 #ifdef MOCHIZUKI_NR_RUNTIME_EXPORTS

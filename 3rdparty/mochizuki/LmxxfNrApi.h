@@ -21,6 +21,10 @@ extern "C"
  * consumer queue before output reuse or destruction. A failed/uncertain clear
  * returns FAILED and the session must be rebuilt. */
 #define LMXXF_NR_CREATE_FLAG_ZERO_OUTPUT_FALLBACK (1u << 0)
+/* mochizuki only (lmxxf rejects it): run the network as ACO's machine code from dlssnr-amd\aco\ (upstream's
+   [Network] ACO Mode), where the driver offers VK_KHR_pipeline_binary; else, or without that folder, as before.
+   Decided once a process, by the first session that starts. */
+#define LMXXF_NR_CREATE_FLAG_ACO (1u << 1)
 
     enum LmxxfNrStatus
     {
@@ -70,6 +74,43 @@ extern "C"
 #define LMXXF_NR_FRAME_FLAG_CODEC_PASSTHROUGH (1u << 2)
 /* Each pass reads its own output from the previous frame, warped by the motion fields below. */
 #define LMXXF_NR_FRAME_FLAG_TEMPORAL (1u << 3)
+/* With TEMPORAL: the smoothing below acts on the network's change to the frame, not on its whole output. */
+#define LMXXF_NR_FRAME_FLAG_SMOOTH_RESIDUAL (1u << 4)
+/* The model's NGX Style is in `style`. Without it lmxxf keeps Style 1, the one its kernels have built in. */
+#define LMXXF_NR_FRAME_FLAG_STYLE (1u << 5)
+/* Reuse the ViT part of the network where the picture has not changed (upstream's DLSS5_VIT_ADAPTIVE=1): faster on a
+   still scene, recomputed in motion, slightly lossy. One pass only; with more it stays off. */
+#define LMXXF_NR_FRAME_FLAG_VIT_REUSE (1u << 6)
+/* The 1080 tier on 1920x1088 instead of NVIDIA's 1920x1152 (DLSS5_NETWORK_1080_ROWS=1088): about 4% faster, slightly
+   lossy at the bottom rows. A change rebuilds the network. */
+#define LMXXF_NR_FRAME_FLAG_COMPACT_1080 (1u << 7)
+/* mochizuki only: the int4 mixed network (upstream's [Int4Mixed]), faster, the picture slightly different. Needs the
+   session's ACO and dlssnr-amd\int4\ with dlssnr-int4.bin; else the default network, and the log says why. A change
+   rebuilds the network, the frames keeping the current one meanwhile while VRAM allows. */
+#define LMXXF_NR_FRAME_FLAG_INT4 (1u << 8)
+/* lmxxf, three passes: run two and extrapolate the third from them (upstream's DLSS5_MULTI_PASS_PREDICT): about a
+   third less time, close to a real third pass. */
+#define LMXXF_NR_FRAME_FLAG_PASS3_ESTIMATE (1u << 9)
+/* lmxxf, two or three passes: where the frame looks like skin, the result goes back toward pass 1's (upstream's
+   DLSS5_MULTI_PASS_SKIN_PROTECT), so faces do not take the extra passes. */
+#define LMXXF_NR_FRAME_FLAG_SKIN_PROTECT (1u << 10)
+/* mochizuki, two or three passes: a later pass sees the first pass's input with only the previous pass's local
+   structure (upstream's cascade_detail_only), so passes add detail and do not stack the network's tone and colour
+   shift. A change rebuilds the network. */
+#define LMXXF_NR_FRAME_FLAG_CASCADE_DETAIL (1u << 11)
+/* mochizuki, two or three passes: after the last, each pixel's luminance is held inside the range the first pass's
+   answer has around it, so thin edges do not gain a rim that grows every pass. Per frame, no rebuild. */
+#define LMXXF_NR_FRAME_FLAG_ANTI_HALO (1u << 12)
+/* mochizuki: the 310.8 model (dlssnr-amd\dlssnr.bin) instead of 310.9's new one (dlssnr-small.bin, about a third
+   faster, the default when it is there). int4 mixed exists for the 310.8 model only. A change rebuilds the network. */
+#define LMXXF_NR_FRAME_FLAG_ORIGINAL_MODEL (1u << 13)
+/* Two or more passes: the first pass's answer as well, in LmxxfNrJob::first_pass_output, for person protection. A
+   texture of the frame's size, readable after RecordOutputs as private_output is. Needs the job's full size; a runtime
+   that has none this frame leaves it null. */
+#define LMXXF_NR_FRAME_FLAG_FIRST_PASS (1u << 14)
+/* lmxxf: the codec's white point measured from the frame's mean luminance (auto_white) instead of a fixed 1.0, on the
+   encode and every decode, for games that hand very dark linear colour. Per frame, no rebuild. */
+#define LMXXF_NR_FRAME_FLAG_AUTO_WHITE (1u << 15)
 
     typedef struct LmxxfNrFrameInfo
     {
@@ -87,7 +128,7 @@ extern "C"
         float color_strength;    /* Colour strength: lmxxf 0..2, mochizuki 0..4, default 1.0; above 1 extrapolates */
         uint32_t debug_view;     /* 0=normal, 1=proxy, 2=neural solo, 3=diff 20x, 4=tint */
         float model_scale;       /* 0.25..1.0, default 1.0 */
-        uint32_t passes;         /* network runs per frame, each on the previous output: 1..3, 0 = 1 */
+        uint32_t passes;         /* network runs per frame, each on the previous output: 1..3 (mochizuki 1..30), 0 = 1 */
         void* motion;            /* ID3D12Resource*, the game's motion vectors; required for TEMPORAL */
         uint32_t motion_state;   /* D3D12_RESOURCE_STATES at RecordInputs */
         uint32_t motion_width;   /* extent the vectors cover; 0 = color_width x color_height */
@@ -96,9 +137,20 @@ extern "C"
         float motion_scale_y;
         uint32_t reset; /* nonzero drops every pass's history this frame */
         /* TEMPORAL: where the last pass's output differs from its warped history by less than the threshold
-           (colour units, 0..1), it is pulled toward the history, by the strength at no difference. 0 = off. */
+           (colour units, 0..1), it is pulled toward the history, by the strength at no difference. 0 = off.
+           SMOOTH_RESIDUAL applies the same rule to the output minus the frame's input, against that difference
+           from the previous frame, and adds the result back to the input. */
         float smooth_threshold;
         float smooth_strength;
+        /* With STYLE: NGX Style 0 Standard (NVIDIA's default), 1 Natural, 2 Cinematic. It is written into the
+           kernels as they load, so a change rebuilds the network (a hitch of a second or two). */
+        uint32_t style;
+        /* mochizuki, TEMPORAL: the game's depth at the colour's extent. The history reads the motion vector at the
+           nearest of five depth taps, so a silhouette takes the foreground's vector. Null: read at the pixel. A host
+           talking to lmxxf sends struct_size without these (offsetof depth), as lmxxf takes only the sizes it knows. */
+        void* depth;             /* ID3D12Resource*: D32, D32S8, R32 or D16 formats; others are left unread */
+        uint32_t depth_state;    /* D3D12_RESOURCE_STATES at RecordInputs */
+        uint32_t depth_inverted; /* nonzero: 1 is near (NGX DepthInverted) */
     } LmxxfNrFrameInfo;
 
     typedef struct LmxxfNrJob
@@ -106,6 +158,8 @@ extern "C"
         uint32_t struct_size;
         void* handle;
         void* private_output; /* ID3D12Resource* for SR; null until PrepareFrame succeeds */
+        /* ID3D12Resource*, with LMXXF_NR_FRAME_FLAG_FIRST_PASS. A host without it sends the struct_size up to here. */
+        void* first_pass_output;
     } LmxxfNrJob;
 
     typedef struct LmxxfNrApi

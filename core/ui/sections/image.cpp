@@ -49,13 +49,15 @@ void Strengths(PanelSettings &s)
          "Above 1 it pushes past what the network returned, still bounded, so it cannot "
          "rotate hue.\n\n"
          "It is a mix, not a parameter of the network: it shows more or less of what the "
-         "network did, it never makes it do more.",
+         "network did, it never makes it do more. On mochizuki it is the model's own intensity instead, in "
+         "the runtime's RenoDX stage.",
 
          "O peso do efeito inteiro. 0.00 dá a mesma imagem que desligar o add-on, o que faz "
          "dele o A/B mais rápido que existe; 1.00 é a rede em força cheia. Acima de 1 empurra "
          "além do que a rede devolveu, ainda limitado, então não consegue rodar matiz.\n\n"
          "É uma mistura, não um parâmetro da rede: mostra mais ou menos do que a rede fez, "
-         "nunca faz ela fazer mais.");
+         "nunca faz ela fazer mais. No mochizuki é a intensidade do próprio modelo, no estágio RenoDX do "
+         "runtime.");
 
     ImGui::SliderFloat(T("Colour", "Cor"), &s.colourStrength, 0.0f, 1.0f, "%.2f", 0);
     Help("Whether the network's colour arrives with its light. This is the control for \"it "
@@ -208,10 +210,12 @@ void Smooth(PanelSettings &s)
 
 } // namespace
 
-void DrawImage(PanelSettings &s)
+void DrawImage(PanelSettings &s, const PanelStatus &status)
 {
     if (!SectionHeader(kHueImage, T("Image", "Imagem"), true))
         return;
+    // A row the runtime has no use for is not drawn, whatever HiddenShown ticked (AvailableOpts).
+    const auto shown = [&](uint32_t bit) { return Shown(s, bit) && (AvailableOpts(status) & bit) != 0; };
     Encoding(s);
     Strengths(s);
     Skin(s);
@@ -219,19 +223,19 @@ void DrawImage(PanelSettings &s)
     // seven games' worth of reference logs agree on, so the ordinary reason to touch one is to
     // answer a question rather than to tune a picture -- which is why each waits for somebody to
     // ask for it in the cascade at the bottom of the panel.
-    if (Shown(s, kOptCompose))
+    if (shown(kOptCompose))
         Compose(s);
     // Both inside the same BeginDisabled, because neither means anything on the additive
     // composition -- which is what the guard being 0 is.
     ImGui::BeginDisabled(s.ratioGuard <= 0.0f);
-    if (Shown(s, kOptGuard))
+    if (shown(kOptGuard))
         Guard(s);
-    if (Shown(s, kOptGuardPerPass))
+    if (shown(kOptGuardPerPass))
         GuardPerPass(s);
     ImGui::EndDisabled();
     if (Shown(s, kOptLocalTone))
         LocalTone(s);
-    if (Shown(s, kOptSmooth))
+    if (shown(kOptSmooth))
         Smooth(s);
 }
 

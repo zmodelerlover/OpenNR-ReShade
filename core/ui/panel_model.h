@@ -69,6 +69,10 @@ struct PanelSettings
     // which on the 32-bit route is in the game's process while the network is in the helper, so the
     // flag has nothing to reach there. Drawn only when PanelStatus::hasFeedEffect says so.
     uint32_t useFeedEffect = 0;
+    // mochizuki's network: the 310.8 model over 310.9's, and int4 mixed (made from the 310.8
+    // model). Not on the bridge's wire either, so on the 32-bit route amd-nr.ini sets them. Drawn
+    // when PanelStatus::mochizukiModels says the files are there.
+    uint32_t mzOriginalModel = 0, mzInt4 = 0;
 
     bool operator==(const PanelSettings &) const = default;
 };
@@ -169,6 +173,9 @@ struct PanelStatus
     bool runtimeInstalled[2] {};
     // mochizuki's last network build in this folder never finished, so this run took danielblnc.
     bool mochizukiCrashed = false;
+    // mochizuki on the 64-bit route: bit 0 both models are in dlssnr-amd\ (dlssnr.bin and dlssnr-small.bin),
+    // bit 1 int4 mixed is (dlssnr-int4.bin and int4\). 0 draws neither switch.
+    uint32_t mochizukiModels = 0;
 };
 
 // What the panel asks for and cannot do itself: the owner of each is on the adapter's side --

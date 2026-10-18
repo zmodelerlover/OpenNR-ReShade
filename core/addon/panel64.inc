@@ -70,6 +70,8 @@ PanelSettings ReadPanelSettings()
         s.passSkin[i] = g.settings.passSkin[i].load();
     }
     s.useFeedEffect = g.settings.useFeedEffect.load() ? 1u : 0u;
+    s.mzOriginalModel = g.settings.mzOriginalModel.load() ? 1u : 0u;
+    s.mzInt4 = g.settings.mzInt4.load() ? 1u : 0u;
     return s;
 }
 
@@ -112,6 +114,13 @@ void ApplyPanelSettings(const PanelSettings &before, const PanelSettings &after)
         g.settings.useFeedEffect.store(after.useFeedEffect != 0);
         g.feedSignature = -1;  // take whatever the effect hands over next as new, not as a repeat
         Log("menu: companion effect %s", after.useFeedEffect != 0 ? "on" : "off");
+    }
+    if (after.mzOriginalModel != before.mzOriginalModel || after.mzInt4 != before.mzInt4)
+    {
+        g.settings.mzOriginalModel.store(after.mzOriginalModel != 0);
+        g.settings.mzInt4.store(after.mzInt4 != 0);
+        Log("menu: mochizuki model %s, int4 %s", after.mzOriginalModel != 0 ? "310.8" : "310.9",
+            after.mzInt4 != 0 ? "on" : "off");
     }
     // Last frame's output no longer means what the next frame's motion vectors assume.
     if (SettingsInvalidateHistory(before, after))
