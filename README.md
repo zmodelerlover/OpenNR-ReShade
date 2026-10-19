@@ -1,4 +1,4 @@
-# AMD Neural Rendering
+# OpenNR
 
 A ReShade add-on that runs neural rendering on AMD GPUs.
 
@@ -22,8 +22,8 @@ Discord: <https://discord.gg/wYhvS3JSHM> - for DLSS 5 in general, not a support 
 
 ## Install
 
-Download **AMD-NR ReShade Installer** from its
-[Releases](https://github.com/zmodelerlover/AMD-NR-ReShade-Installer/releases) page. It is one `.exe` and
+Download **OpenNR Installer** from its
+[Releases](https://github.com/zmodelerlover/OpenNR-Installer/releases) page. It is one `.exe` and
 needs nothing installed to run.
 
 The installer finds your games, works out which renderer each one uses, downloads the runtime and
@@ -45,7 +45,7 @@ There is a [video of the whole install](https://www.youtube.com/watch?v=L2v0b98w
 
 ## Turn it on
 
-Press **Home** to open ReShade, go to the **Add-ons** tab, and find **AMD Neural Rendering**.
+Press **Home** to open ReShade, go to the **Add-ons** tab, and find **OpenNR**.
 
 The add-on starts switched off. Tick **Enabled** or press **Ctrl+End**.
 
@@ -126,11 +126,11 @@ of them, about 280 MB more VRAM per pass; on RDNA4 it needs nothing more than v0
 ## The mochizuki runtime (experimental)
 
 The add-on can also run the network through `MochizukiNrRuntime.dll`, the runtime the
-[OptiScaler AMD NR fork](https://github.com/MatheusFerreiraS/neural-amd-opti) ships for
+[OptiScaler AMD NR fork](https://github.com/MatheusFerreiraS/OpenNR-OptiScaler) ships for
 [DLSSNR-AMD](https://github.com/mochizuki0323/DLSSNR-AMD) by mochizuki0323. That is a Vulkan port of
 the same network, with FP8 matrix instructions that only RDNA4 (RX 9000) has. It needs no HIP.
 
-AMD-NR-ReShade Installer v0.7.11 and later put it in on every RDNA4 card (v0.6.3 to v0.7.10 when you
+The installer, v0.7.11 and later put it in on every RDNA4 card (v0.6.3 to v0.7.10 when you
 ticked **mochizuki** in a game's sheet). By hand, put `MochizukiNrRuntime.dll` and its `dlssnr-amd\` folder (shaders and
 `dlssnr.bin`, generated from your own `nvngx_dlssnr.dll` 310.8.0) next to the game's executable.
 Then pick **mochizuki (Vulkan)** in **NR runtime**, under Language in the panel. The panel says when

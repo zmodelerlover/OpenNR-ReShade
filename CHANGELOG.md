@@ -1,5 +1,15 @@
 ﻿# Changelog
 
+## v0.7.14 - 2026-10-19 - OpenNR
+
+Built on v0.7.13 with the same runtimes and the same bridge protocol (v6).
+
+- **The project is called OpenNR now.** The add-on and its panel are **OpenNR** in ReShade's Add-ons tab, and
+  **OpenNR (32-bit)** on the 32-bit route. The installer is OpenNR Installer, and the repositories moved to
+  `zmodelerlover/OpenNR-ReShade`, `zmodelerlover/OpenNR-Installer` and `MatheusFerreiraS/OpenNR-OptiScaler`
+  (the old addresses redirect). File names in the game folder (`amd-nr.addon64`, `amd-nr.ini`, ...) are
+  unchanged, so an update keeps every setting.
+
 ## v0.7.13 - 2026-10-18 - mochizuki on its new runtime, HIP device matching fallback
 
 Built on v0.7.12 with the same bridge protocol (v6). The danielblnc and lmxxf runtimes are unchanged.

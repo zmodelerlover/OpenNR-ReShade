@@ -3022,7 +3022,7 @@ void OnPresent(command_queue *queue, swapchain *sc, const rect *, const rect *, 
 
 }
 
-extern "C" __declspec(dllexport) const char *NAME = "AMD Neural Rendering";
+extern "C" __declspec(dllexport) const char *NAME = "OpenNR";
 extern "C" __declspec(dllexport) const char *DESCRIPTION =
     "Runs DLSS-NR on AMD with HIP 7. D3D11/D3D12"
 #if AMDNR_WITH_VULKAN
@@ -3042,7 +3042,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
             return FALSE;
         {
             OpenLog();
-            Log("AMD Neural Rendering: %s", ProfileForThisProcess().note);
+            Log("OpenNR: %s", ProfileForThisProcess().note);
             Log("preview 2026-09-10: SDR input contract, serialized inline passes; Vulkan %d, "
                 "OpenGL %d", AMDNR_WITH_VULKAN, AMDNR_WITH_OPENGL);
             // Before the read, so a first run has a documented file to read and the user has
@@ -3083,7 +3083,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
         reshade::register_event<reshade::addon_event::reshade_finish_effects>(OnFinishEffects);
         reshade::register_event<reshade::addon_event::present>(OnPresent);
         if (g.events & 16)
-            reshade::register_overlay("AMD Neural Rendering", OnOverlay);
+            reshade::register_overlay("OpenNR", OnOverlay);
         Log("events subscribed: mask %d (destroy_swapchain and destroy_device always on)",
             g.events);
         for (FrameTransport *transport : AllTransports())
@@ -3097,7 +3097,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
         if (g_probe != nullptr)
             RemoveVectoredExceptionHandler(g_probe);
         if (g.events & 16)
-            reshade::unregister_overlay("AMD Neural Rendering", OnOverlay);
+            reshade::unregister_overlay("OpenNR", OnOverlay);
         reshade::unregister_addon(module);
         if (g_log != nullptr)
             fclose(g_log), g_log = nullptr;

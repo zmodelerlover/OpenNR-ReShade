@@ -130,7 +130,7 @@ assert 'ImGui::IsItemDeactivated()' in ui and 'PanelAction::LiftScaleCap' in ui
 # A route difference is data, never a preprocessor branch inside the panel.
 assert re.findall(r'^\s*#\s*if\w*\s+(\w+)',ui,re.M)==['RESHADE_API_VERSION']
 assert 'g.settings.inlineMode.store(true)' in h and 'LoadSettings();ForceInline();' in h
-assert 'register_overlay("AMD Neural Rendering (32-bit)",OnOverlay32)' in front
+assert 'register_overlay("OpenNR (32-bit)",OnOverlay32)' in front
 assert h.index('SaveSettings();Snapshot')>h.index('case Kind::SaveSettings:')
 fields=read(n/'settings_fields.inc')
 rows=[re.fullmatch(r'X\((uint32_t|int32_t|float), ([A-Za-z]+), "([A-Za-z]*)", ([-.0-9e]+), ([-.0-9e]+), ([-.0-9e]+)\)',line) for line in fields.splitlines() if not line.startswith('//')]

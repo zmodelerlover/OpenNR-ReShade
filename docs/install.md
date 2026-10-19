@@ -1,6 +1,6 @@
 # Installing, by hand
 
-**Most people should not read this file.** Use **AMD-NR ReShade Installer**, from the Releases page:
+**Most people should not read this file.** Use **OpenNR Installer**, from the Releases page:
 it finds the games, works out which renderer each one uses, downloads and verifies the runtime and
 the weights, installs ReShade and the add-on, and can take it all back out. There is a video of the
 whole thing: <https://www.youtube.com/watch?v=L2v0b98wReQ>
@@ -82,7 +82,7 @@ installer follows it. That is what puts the files in `bin` for Source-engine gam
 
 ## Turning it on
 
-It starts switched off. Open the ReShade overlay with **Home**, find **AMD Neural Rendering**,
+It starts switched off. Open the ReShade overlay with **Home**, find **OpenNR**,
 and enable it — or press **Ctrl+End**. `StartOn=1` in `amd-nr.ini` makes it come up enabled.
 
 ## Taking it back out

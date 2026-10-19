@@ -716,7 +716,7 @@ void OnPresent(command_queue*,swapchain* sc,const rect*,const rect*,uint32_t,con
     }
 }
 }
-extern "C" __declspec(dllexport) const char* NAME="AMD Neural Rendering (32-bit)";
+extern "C" __declspec(dllexport) const char* NAME="OpenNR (32-bit)";
 extern "C" __declspec(dllexport) const char* DESCRIPTION="Native D3D9/D3D10/D3D11/OpenGL x86 to original x64 neural engine; same-frame CPU barriers.";
 // The frontend's side of frontend_port.h: the few things the panel adapter reads or switches.
 namespace frontend32 {
@@ -753,9 +753,9 @@ BOOL APIENTRY DllMain(HMODULE module,DWORD reason,LPVOID){
         reshade::register_event<reshade::addon_event::destroy_swapchain>(OnDestroy);
         reshade::register_event<reshade::addon_event::destroy_device>(OnDestroyDevice);
         reshade::register_event<reshade::addon_event::present>(OnPresent);
-        reshade::register_overlay("AMD Neural Rendering (32-bit)",OnOverlay32);
+        reshade::register_overlay("OpenNR (32-bit)",OnOverlay32);
     }else if(reason==DLL_PROCESS_DETACH){
-        reshade::unregister_overlay("AMD Neural Rendering (32-bit)",OnOverlay32);
+        reshade::unregister_overlay("OpenNR (32-bit)",OnOverlay32);
         reshade::unregister_addon(module);
         // No waits or graphics calls while holding the loader lock. Normal retirement is
         // in destroy_swapchain. The private kill-on-close job isolates forced unload/exit.

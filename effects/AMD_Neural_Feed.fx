@@ -1,5 +1,5 @@
 /*
-    AMD_Neural_Feed.fx - companion effect for the AMD Neural Rendering (AMD) add-on.
+    AMD_Neural_Feed.fx - companion effect for the OpenNR add-on.
 
     The add-on already estimates motion from the image when a game hands over nothing. That
     estimator is two levels of 3x3 block matching with a search radius of four, and it has to

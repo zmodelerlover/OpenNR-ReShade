@@ -1,6 +1,6 @@
 # x86bridge overlay, protocol v6
 
-Generic native D3D9/D3D11 x86 frontend to the original x64 neural engine, with an experimental D3D8 route through the official d3d8to9 translator. This source update adds the ReShade panel **AMD Neural Rendering** while keeping the 32-bit transport isolated from the existing x64 rendering routes.
+Generic native D3D9/D3D11 x86 frontend to the original x64 neural engine, with an experimental D3D8 route through the official d3d8to9 translator. This source update adds the ReShade panel **OpenNR** while keeping the 32-bit transport isolated from the existing x64 rendering routes.
 
 ## Build and install
 
@@ -17,7 +17,7 @@ The script invokes native `Hostx64\x86\cl.exe` and `Hostx64\x64\cl.exe`, C++20, 
 
 With the application closed, copy **both** files beside the ReShade proxy that the game actually loads, replacing the v1 pair together. Keep existing ReShade x86, `amd-nr.ini`, runtime DLLs, weights and runtime directories in place. Source-engine games commonly use a `bin` subdirectory recorded as `[INSTALL] BasePath` in the root ReShade INI. Do not mix protocol versions.
 
-Open ReShade and the AMD Neural Rendering panel. Initial settings come from the host's original LoadSettings, not frontend defaults. If the effect starts disabled, opening the panel requests synchronization through the next D3D9 or D3D11 Present and the existing helper launch path.
+Open ReShade and the OpenNR panel. Initial settings come from the host's original LoadSettings, not frontend defaults. If the effect starts disabled, opening the panel requests synchronization through the next D3D9 or D3D11 Present and the existing helper launch path.
 
 The native x86/x64 build and protocol checks run in GitHub Actions. Live ReShade, GPU and game behavior still require manual validation on supported AMD hardware.
 
