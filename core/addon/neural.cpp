@@ -836,6 +836,8 @@ struct State
     std::filesystem::path runtimeFile;  // the file runtime was loaded from; the copies come from it
     UINT lastJob = 0;
     UINT activePasses = 0;
+    // Frames in a row whose first pass the engine turned down (HeldOver).
+    UINT refusedRun = 0;
     // Log recording and parameter handoff once per process.
     bool loggedPassDetail = false;
     HipSetFn hipSet = nullptr;
@@ -938,6 +940,7 @@ struct State
     char feedStatus[192] = "";
     int feedSignature = -1;
     unsigned feedZeroProbes = 0, feedZeroLatches = 0;  // the effect's field read all zero: probes.inc
+    unsigned gameZeroProbes = 0;  // and the game's own: probes.inc
     bool feedMotionZero = false;
     UINT64 feedRetryAt = 0;  // when AdoptFeedEffect hands motion back to the effect to look again
     // Diagnostic. Runs the entire bridge but never touches the swapchain image, which is the
@@ -1038,6 +1041,16 @@ State &g = *new State;
 // own mean in that scene is 0.003. Leaving it out of a frame is below anyone's threshold;
 // putting it in the wrong place is not.
 
+bool RuntimeInline();  // runtimes.inc
+
+// Async, an engine still on its last job turns the next one down, and on a slow card it does so every other frame.
+// The residual it holds is that last job's, as late as async already composes it, so a frame or two keeps it rather
+// than strobing between NR and the game's own picture. Same frame, a refusal means something else: it stays out.
+bool HeldOver()
+{
+    return !RuntimeInline() && g.refusedRun > 0 && g.refusedRun <= 2;
+}
+
 bool CompositionIsFresh(bool ranNetwork)
 {
     // A debug view draws a buffer, not a correction, so it has nothing that can go stale -- and
@@ -1050,7 +1063,7 @@ bool CompositionIsFresh(bool ranNetwork)
     // make the mode flicker between two different pictures, which is worse than either.
     if (g.settings.debugView.load() != 0 || g.settings.networkOutput.load())
         return true;
-    return ranNetwork && g.activePasses != 0;
+    return ranNetwork && (g.activePasses != 0 || HeldOver());
 }
 
 int RuntimeTonemap()
@@ -2690,6 +2703,8 @@ bool RecordNetwork(ID3D12GraphicsCommandList *&cmd, ID3D12Resource *colourSrc,
         }
         if (At<ID3D12CommandList *>(r, rt::B->kListMarker) != cmd)
         {
+            if (i == 0)
+                ++g.refusedRun;
             if (++g_stats.now.refused % 600 == 1)
                 Log("pass %u refused (%llu total): %s", i + 1,
                     static_cast<unsigned long long>(g_stats.now.refused), RefusalReason(r));
@@ -2749,6 +2764,8 @@ bool RecordNetwork(ID3D12GraphicsCommandList *&cmd, ID3D12Resource *colourSrc,
     }
     g.activePasses = accepted;
     g.historyValid.fetch_and((1u << accepted) - 1);  // a pass that sat this frame out has none
+    if (accepted != 0)
+        g.refusedRun = 0;
     // The same table the instrumented NVIDIA fork prints, in the same columns, so the two logs can
     // be put side by side and read off. Once per arrangement: it reprints when the count or any
     // resolved value changes and stays quiet otherwise.
@@ -2865,7 +2882,7 @@ bool RecordNetwork(ID3D12GraphicsCommandList *&cmd, ID3D12Resource *colourSrc,
     // no correction, because one aimed at where the picture used to be reads as a trail. Zero
     // intensity makes every step of the composition the identity, additive or ratio alike. A debug
     // view is exempt for the reason CompositionIsFresh gives: what it draws is a buffer.
-    const bool stale = !(runNetwork && g.activePasses != 0) && dbg == 0 && !g.settings.networkOutput.load();
+    const bool stale = !(runNetwork && (g.activePasses != 0 || HeldOver())) && dbg == 0 && !g.settings.networkOutput.load();
     // mochizuki's RenoDX stage hands back a finished picture with Intensity and Colour already in it:
     // additive at full strength, unbounded, puts exactly that on the frame. A debug view keeps its own.
     const bool finished = MzSelected() && dbg == 0;

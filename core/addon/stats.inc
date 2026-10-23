@@ -39,6 +39,7 @@ std::unique_lock<std::mutex> LockForHook()
 
 HMODULE RuntimeFor(UINT slot);  // runtimes.inc
 int Outstanding(HMODULE m);
+bool RuntimeInline();
 bool MzSelected();
 
 // Why the record entry turned pass `r` down, as far as the runtime's own state says: it refuses when
@@ -49,8 +50,11 @@ const char *RefusalReason(HMODULE r)
     static char why[128];
     if (At<uint8_t>(r, rt::B->kReady) == 0)
         return "the engine is not ready";
+    // Async never moves kJobCounter, so there the count says nothing: the engine is still on its last job.
     std::snprintf(why, sizeof(why), "%s: job %u, %u retired",
-                  Outstanding(r) >= 4 ? "four jobs already in flight" : "no reason the runtime's state shows",
+                  !RuntimeInline()      ? "async, the engine is still on its last job"
+                  : Outstanding(r) >= 4 ? "four jobs already in flight"
+                                        : "no reason the runtime's state shows",
                   At<UINT>(r, rt::B->kJobId), At<UINT>(r, rt::B->kJobCounter));
     return why;
 }

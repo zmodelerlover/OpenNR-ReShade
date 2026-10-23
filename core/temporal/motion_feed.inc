@@ -34,13 +34,20 @@ ComPtr<ID3D12PipelineState> &g_motionFeed = *new ComPtr<ID3D12PipelineState>;
 // re-probes, so a buffer that is still not velocity is demoted again ~120 presents later, the feed
 // zeroing it meanwhile. Nothing remembers which buffer it was: a raw pointer can be the game's next
 // allocation, and a reference would hold its buffer across its own resize.
-void DemoteMotion(double meanPx)
+void DemoteMotion(const char *why)
 {
     if (g.guideMotion.failed)
         return;
     g.guideMotion.failed = true;
-    Log("guide motion: mean |d| %.0f px, longer than the raster, so this buffer is not velocity. "
-        "Giving up on it; the estimator takes the motion over.", meanPx);
+    g.gameZeroProbes = 0;
+    Log("guide motion: %s, so this buffer is not velocity. Giving up on it; the estimator takes the motion over.", why);
+}
+
+void DemoteMotion(double meanPx)
+{
+    char why[64];
+    std::snprintf(why, sizeof(why), "mean |d| %.0f px, longer than the raster", meanPx);
+    DemoteMotion(why);
 }
 
 // The longest vector the feed lets through: MotionMaxPx, or the raster when that is 0. The guide

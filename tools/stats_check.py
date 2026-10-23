@@ -85,6 +85,7 @@ alignas(4) uint8_t module[32] {};
 template <class T> T &At(HMODULE h, size_t rva) { return *reinterpret_cast<T *>(reinterpret_cast<uintptr_t>(h) + rva); }
 HMODULE RuntimeFor(UINT) { return reinterpret_cast<HMODULE>(module); }
 int Outstanding(HMODULE m) { return static_cast<int>(At<UINT>(m, 8) - At<UINT>(m, 12)); }
+bool RuntimeInline() { return true; }
 float HalfToFloat(uint16_t h) {  // probes.inc's
     const int e = (h >> 10) & 0x1f, m = h & 0x3ff;
     const float v = e == 0 ? m / 1024.0f * 6.103515625e-5f : std::ldexp(1.0f + m / 1024.0f, e - 15);

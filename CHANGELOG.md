@@ -1,5 +1,19 @@
 ﻿# Changelog
 
+## v0.7.15 - 2026-10-23 - danielblnc async without flicker, empty game motion
+
+Built on v0.7.14 with the same runtimes and the same bridge protocol (v6).
+
+- **No more NR on, NR off every other frame with danielblnc in async.** On a card where one job takes longer than a
+  frame (0.5.1 at 1440p on an RX 9060 XT took about 37 ms), the runtime turns down every other frame, and each one it
+  turned down showed the game's own picture. Now a frame turned down because the last job is still running keeps the
+  last correction for up to two frames, which is as late as async already is. Same-frame timing is unchanged. The log
+  line for it now says so ("async, the engine is still on its last job") instead of "four jobs already in flight".
+- **A game whose motion buffer is never written gets optical flow instead.** When the game's own motion vectors read
+  all zero in two readings of a scene that moves (its depth changed), the add-on gives that buffer up, as it already
+  did for `AMD_Neural_Feed.fx`'s field, and the motion comes from FidelityFX optical flow or the estimator. Fed as
+  fact, an empty field smeared the history (flashing in Assetto Corsa with Custom Shaders Patch).
+
 ## v0.7.14 - 2026-10-19 - OpenNR
 
 Built on v0.7.13 with the same runtimes and the same bridge protocol (v6).

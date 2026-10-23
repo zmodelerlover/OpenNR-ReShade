@@ -58,7 +58,7 @@ void RearmGuideProbe(bool replaced)
     SetDepthUsable(true, "the guide probe looks again");
 }
 
-void DemoteMotion(double meanPx);  // core/temporal/motion_feed.inc
+void DemoteMotion(double meanPx), DemoteMotion(const char *why);  // core/temporal/motion_feed.inc
 float FeedCap();
 void NoteFlicker(const void *in, const void *out, UINT rowPitch, UINT nw, UINT nh, bool first);  // stats.inc
 void DrainReadbacks(UINT nw, UINT nh)
@@ -179,9 +179,9 @@ void DrainReadbacks(UINT nw, UINT nh)
                     zero == n ? "  <-- ALL ZERO. Either nothing is moving, or the guide picked a "
                                 "buffer the engine does not write velocity into."
                               : "");
-                // The effect's field all zero in two readings of a moving scene (issue #18). A still menu reads
-                // all zero honestly, so a reading counts only when the depth fed with it changed (ponytail: no
-                // real depth, never counts). Retried 1200 presents on, doubling to 9600, or on new inputs.
+                // The effect's field (issue #18), or the game's (CSP in Assetto Corsa), all zero in two readings of a
+                // moving scene. A still menu reads all zero honestly, so a reading counts only when the depth fed with it
+                // changed (ponytail: no real depth, never counts). Retried 1200 presents on, doubling to 9600, or on new inputs.
                 static double lastDepthSum = -1.0;
                 const bool sceneMoved = g.probedDepth && depthReal && lastDepthSum >= 0.0 && sum != lastDepthSum;
                 lastDepthSum = g.probedDepth && depthReal ? sum : -1.0;
@@ -215,6 +215,8 @@ void DrainReadbacks(UINT nw, UINT nh)
                 // add-on stopped asking for the rest of the run.
                 if (g.gameMotionActive && mag / (2.0 * n) > std::max(nw, nh))
                     DemoteMotion(mag / (2.0 * n));
+                g.gameZeroProbes = !g.gameMotionActive || zero < n ? 0 : g.gameZeroProbes + (sceneMoved ? 1 : 0);
+                if (g.gameZeroProbes == 2) DemoteMotion("all zero in two readings of a moving scene");
                 if (depthReal && zero < n && !g.guideMotion.failed)
                 {
                     g.guidesLookReal.store(true);
