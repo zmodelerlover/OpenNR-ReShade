@@ -127,7 +127,7 @@ of them, about 280 MB more VRAM per pass; on RDNA4 it needs nothing more than v0
 
 The add-on can also run the network through `MochizukiNrRuntime.dll`, the runtime the
 [OptiScaler AMD NR fork](https://github.com/MatheusFerreiraS/OpenNR-OptiScaler) ships for
-[DLSSNR-AMD](https://github.com/mochizuki0323/DLSSNR-AMD) by mochizuki0323. That is a Vulkan port of
+[DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD) by mochizuki0323. That is a Vulkan port of
 the same network, with FP8 matrix instructions that only RDNA4 (RX 9000) has. It needs no HIP.
 
 The installer, v0.7.11 and later put it in on every RDNA4 card (v0.6.3 to v0.7.10 when you
@@ -288,7 +288,7 @@ D3D12, Vulkan and OpenGL routes, the 32-bit bridge, the guide capture and the ov
 
 It has its own terms. The MIT licence below covers only the code in this repository.
 
-The optional mochizuki runtime is **[DLSSNR-AMD](https://github.com/mochizuki0323/DLSSNR-AMD)** by
+The optional mochizuki runtime is **[DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD)** by
 **mochizuki0323** (MIT), built as `MochizukiNrRuntime.dll` by the OptiScaler AMD NR fork. The add-on
 loads it and ships none of it.
 

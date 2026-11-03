@@ -7,5 +7,5 @@ commit `b019c9e2b`, the ABI of the runtime with the RenoDX stage, the 310.9.16 m
 `OptiScaler/dlssnr/backend/mochizuki_runtime/MochizukiNrControls.h`.
 
 They describe `MochizukiNrRuntime.dll`, which runs mochizuki0323's Vulkan port of the network
-(<https://github.com/mochizuki0323/DLSSNR-AMD>, MIT). The add-on loads that DLL at run time and
+(<https://gitlab.com/mochizuki0323/DLSSNR-AMD>, MIT). The add-on loads that DLL at run time and
 links nothing from it.
