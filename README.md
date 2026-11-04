@@ -10,6 +10,8 @@ does not reimplement it. Current release: v0.7.15.
 
 Discord: <https://discord.gg/wYhvS3JSHM>
 
+Ko-fi: <https://ko-fi.com/T6T213OVFE>
+
 ## What you need
 
 | | |
