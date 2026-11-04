@@ -1,302 +1,119 @@
-# OpenNR
+# OpenNR for ReShade
 
-A ReShade add-on that runs neural rendering on AMD GPUs.
+A ReShade add-on that runs NVIDIA's DLSS 5 neural rendering (NR) network on AMD Radeon cards. It is the ReShade side of
+the OpenNR project, for games and emulators where the [OptiScaler route](https://github.com/MatheusFerreiraS/OpenNR-OptiScaler)
+doesn't fit: D3D11 games, older APIs, 32-bit games and emulators.
 
-NVIDIA's DLSS 5 tools call `nvngx_dlssnr.dll`, which does nothing on a Radeon. This add-on drives
-the AMD port of the same network instead. The port is
-[DLSS-NR-on-AMD](https://github.com/danielblnc/DLSS-NR-on-AMD) by danielblnc. This project does not
-reimplement the network. See [Credits](#credits).
+The network itself comes from danielblnc's [DLSS-NR-on-AMD](https://github.com/danielblnc/DLSS-NR-on-AMD) runtime or,
+on RX 9000, from mochizuki0323's [DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD) Vulkan port. This project
+does not reimplement it. Current release: v0.7.15.
 
-This is a proof of concept. It works, but it is not finished software.
-
-Discord: <https://discord.gg/wYhvS3JSHM> - for DLSS 5 in general, not a support channel for this.
+Discord: <https://discord.gg/wYhvS3JSHM>
 
 ## What you need
 
 | | |
 |---|---|
-| GPU | AMD RDNA2, RDNA3 or RDNA4 with the HIP 7 runtime (`amdhip64_7.dll`). HIP 6 does not work. A current Adrenalin driver includes it on RX 7000 and RX 9000; RX 6000 (RDNA2) needs AMD's HIP SDK 7.2, which the add-on finds through `HIP_PATH`. Does nothing on NVIDIA or Intel. |
-| Renderer | Direct3D 11 works best. Direct3D 12 works, but ReShade is not a good way into a D3D12 game and it is not the route to recommend today; wait for the OptiScaler builds instead. Direct3D 10, Vulkan and OpenGL are experimental. 32-bit games are experimental: Direct3D 8, 9, 10 and 11, and OpenGL. |
-| ReShade | The build labelled "with full add-on support", version 6.x. The normal build cannot load add-ons. |
-| Disk | About 150 MB for the network weights. |
+| GPU | Radeon RX 6000, RX 7000 or RX 9000 with the HIP 7 runtime (`amdhip64_7.dll`). Current Adrenalin drivers include it on RX 7000 and RX 9000; RX 6000 needs AMD's HIP SDK 7.2. mochizuki needs an RX 9000 and no HIP. |
+| Renderer | Direct3D 11 works best. Direct3D 12 works, but the OptiScaler route is better there. Direct3D 10, Vulkan and OpenGL are experimental, and so are 32-bit games (D3D8, D3D9, D3D10, D3D11, OpenGL). |
+| ReShade | The build "with full add-on support", 6.x. The normal build cannot load add-ons. |
+| Disk | About 150 MB for the weights. |
 
 ## Install
 
-Download **OpenNR Installer** from its
-[Releases](https://github.com/zmodelerlover/OpenNR-Installer/releases) page. It is one `.exe` and
-needs nothing installed to run.
-
-The installer finds your games, works out which renderer each one uses, downloads the runtime and
-the weights, checks every hash, installs ReShade and the add-on, and can uninstall all of it. It
-writes a record of what it installed, so uninstall restores what it replaced.
-
-Two things it cannot do:
-
-- It cannot set the renderer inside the game. For emulators this setting decides whether the
-  add-on works at all. The installer tells you which renderer to pick.
-- It cannot install ReShade for Vulkan. On Vulkan, ReShade is a system-wide layer instead of a DLL
-  next to the game, so run ReShade's own installer for that.
-
-The renderer detection is usually right but not always. One folder can contain both a D3D11 and a
-D3D12 executable. A wrong choice installs fine and then does nothing in the game. Each game card
-links to that game's PCGamingWiki page. Check it before installing.
-
+Get the [OpenNR Installer](https://github.com/zmodelerlover/OpenNR-Installer/releases). It finds your games, picks the
+renderer, downloads ReShade, the add-on, the runtime and the weights, checks every file, and can uninstall it all.
 There is a [video of the whole install](https://www.youtube.com/watch?v=L2v0b98wReQ).
+
+Two things to know:
+
+- The renderer detection is usually right, not always. A wrong pick installs fine and then does nothing. Each game
+  card links to its PCGamingWiki page.
+- For emulators, the renderer you pick inside the emulator decides whether the add-on works. The installer tells you
+  which one.
 
 ## Turn it on
 
-Press **Home** to open ReShade, go to the **Add-ons** tab, and find **OpenNR**.
+Press **Home** to open ReShade, go to the **Add-ons** tab and find **OpenNR**. It starts off: tick **Enabled** or press
+**Ctrl+End**. **On at startup** turns it on when the game opens.
 
-The add-on starts switched off. Tick **Enabled** or press **Ctrl+End**.
+Every control has a `(?)` tooltip, and settings save to `amd-nr.ini` as you change them. The main ones:
 
-It starts off on purpose. The add-on rewrites every frame, and some settings can crash the display
-driver, so nothing happens until you have looked at the panel.
+- **Scale**: size of the network input. Smaller is faster and loses fine detail.
+- **Passes**: one to three runs of the network. More passes give a stronger effect and can add grain.
+- **Limit** (Debug section): how much the image may change.
+- **NR runtime**: danielblnc or mochizuki (RX 9000). Applies on the next game start.
 
-You can change this. **On at startup** turns it on when the game opens. The toggle hotkey can be
-rebound. **Off on alt-tab** turns it off when the game loses focus.
+Red controls can crash the display driver. Everything else is under **More settings**.
 
-## Settings
+## Runtimes
 
-Every control has a `(?)` tooltip that explains what it does. The panel is in English or Brazilian
-Portuguese; use the **Language** control to switch.
+- **danielblnc**: the add-on runs 0.6.0, which the installer puts in, and still accepts 0.5.1, 0.5.0, 0.4.3, 0.4.2 and
+  0.4.1. It checks the file's hash and refuses anything else.
+- **mochizuki** (RX 9000): `MochizukiNrRuntime.dll` and its `dlssnr-amd\` folder, built by the OpenNR OptiScaler fork.
+  The installer adds it on RX 9000 cards. The first start in each game builds the network, which can take up to a
+  minute; frames go through untouched until it's ready. Its log is `mochizuki_nr.log`.
 
-Settings are saved to `amd-nr.ini` as soon as you release a control. Nothing is lost by
-closing the game.
+## Motion vectors
 
-The controls are colour-coded:
+The network wants colour, depth, motion and exposure. On D3D11 games that render a velocity buffer, the add-on hands
+over the game's own vectors. Everywhere else the 64-bit add-on estimates motion with AMD FidelityFX optical flow.
 
-| Colour | Meaning |
-|---|---|
-| Red | This value can crash the display driver. |
-| Amber | A measured warning: the skip rate is climbing, or the card's own limit has fired. |
-
-The main controls:
-
-- **Scale** — the size of the network input relative to the frame. 0.50 uses a quarter
-  of the pixels. Smaller is faster and loses fine detail.
-- **Passes** — one to three evaluations. More passes strengthen the effect and can add grain.
-  A change applies live, with one long frame for each copy of the runtime a count needs the
-  first time, loaded one a frame (about 150 MB of VRAM each, kept until the game exits).
-- **Limit** — caps how much the image is changed. Default 0.25. In the **Debug** section.
-- **Timing** — on a 64-bit game, **Same frame** (the default) or **Async**, saved as `Inline` in
-  `amd-nr.ini`. Async stops the game's GPU queue from waiting for the network every frame, and the answer
-  lands one frame later; danielblnc traces the freezes some players met to those waits. A frame that comes
-  while the network is still busy goes out as the game drew it, so a slower card gets the effect on fewer
-  frames. It applies the next time the game starts. On a 32-bit game Timing chooses presentation instead:
-  pipelined is the default, because it measured 16% to 41% faster in three games and costs one frame of
-  lag and nothing else; it is saved as `Async`.
-
-The defaults are a reasonable starting point. For a steady picture they turn on **Temporal**
-(`Temporal=2`), **Fixed seed** (`FixedSeed=1`) and **Output smoothing** at 0.80 with a 10/255
-limit (`OutputSmooth=0.8`, `OutputSmoothLimit=10`), the steadiest set measured on recorded play.
-An `amd-nr.ini` you already have keeps every value it sets, with one exception made once: one
-from before v0.7.0 that holds `Temporal=0`, the default then, moves to `Temporal=2`, and the log
-says so. To go back, set Temporal to Auto,
-untick Fixed seed and slide Output smoothing to off, or write `Temporal=0`, `FixedSeed=0` and
-`OutputSmooth=0` in `amd-nr.ini`.
-
-The panel shows fifteen controls. Everything
-else it can do is one tick away under **More settings** at the bottom, and all of it is
-editable in `amd-nr.ini` either way.
-
-One of those is **Network precision** (Engine), on danielblnc v0.4.2, v0.4.3, 0.5.0, 0.5.1 and 0.6.0: the runtime's own
-`Quality`. **Fast**, the default, uses cheaper arithmetic and is about 13 to 15% faster on RX 9000,
-with a difference that is barely visible; **Reference** is NVIDIA's exact arithmetic. It applies
-at once, is saved as `Quality` in `amd-nr.ini` (1 fast, 0 reference) and is used instead of the
-`Quality` in the runtime's own `dlssnr_on_amd.ini`.
-
-## Which danielblnc runtime
-
-The add-on runs **DLSS-NR-on-AMD 0.6.0**, which the installer puts in, and still runs **0.5.1**, **0.5.0**, **v0.4.3**,
-**v0.4.2** and **v0.4.1**, so a folder that keeps an older `dlssnr_amd_pass1.dll` goes on working. It tells the builds apart
-by hash and refuses any other; the status column says which one runs.
-
-0.6.0 adds RX 6000 (RDNA2) cards; on those it needs the HIP SDK 7.2 runtime from AMD's site, since their drivers ship
-HIP 6.4 only. The SDK sets `HIP_PATH` and leaves `PATH` alone, and the add-on loads `amdhip64_7.dll` from
-`HIP_PATH\bin` when the system has none. To patch a runtime by hand:
-
-```
-python tools/extract_runtime.py dlssnr_on_amd_setup.exe version.dll      (only for the setup)
-python tools/patch_runtime.py version.dll tools/runtime-patches.json dlssnr_amd_pass1.dll
-```
-
-The weights are the same file for all of them. On an RDNA3 card 0.5.0, 0.5.1 and 0.6.0 keep a half-precision copy
-of them, about 280 MB more VRAM per pass; on RDNA4 it needs nothing more than v0.4.3.
-
-## The mochizuki runtime (experimental)
-
-The add-on can also run the network through `MochizukiNrRuntime.dll`, the runtime the
-[OptiScaler AMD NR fork](https://github.com/MatheusFerreiraS/OpenNR-OptiScaler) ships for
-[DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD) by mochizuki0323. That is a Vulkan port of
-the same network, with FP8 matrix instructions that only RDNA4 (RX 9000) has. It needs no HIP.
-
-The installer, v0.7.11 and later put it in on every RDNA4 card (v0.6.3 to v0.7.10 when you
-ticked **mochizuki** in a game's sheet). By hand, put `MochizukiNrRuntime.dll` and its `dlssnr-amd\` folder (shaders and
-`dlssnr.bin`, generated from your own `nvngx_dlssnr.dll` 310.8.0) next to the game's executable.
-Then pick **mochizuki (Vulkan)** in **NR runtime**, under Language in the panel. The panel says when
-the one picked is not in the game's folder. The choice is saved to `amd-nr.ini` as
-`NrBackend=mochizuki` or `danielblnc` and applies when the game is started again. With no `NrBackend`,
-an installed mochizuki runs; with `NrBackend=mochizuki` and its files gone, the add-on runs danielblnc.
-If a start dies while the network is building (a driver crash), the next start runs danielblnc, writes
-`NrBackend=danielblnc` and says so in the panel; picking mochizuki again tries once more.
-
-The first time in each game the network takes up to a minute to build, and frames go out untouched
-until it is ready; the status column says "mochizuki: building the network" meanwhile, then the
-network's GPU time. On the 32-bit bridge that line is not shown yet; `mochizuki_nr.log` has it.
-
-Scale, Passes, Structure, Tone, Skin, the character mask, the per-pass profiles and every compose
-control (Intensity, Limit, Colour Strength, the grade) work as they do with the danielblnc runtime.
-The Engine controls that write into `dlssnr_amd_pass1.dll` (Temporal, Tonemap, Tone channels, Output
-scale, Timing) have no effect on it. Temporal history follows **History** and the motion field.
-Its log is `mochizuki_nr.log` in the game folder.
-
-Measured with framecheck on its 960x540 frame (RX 9070 XT): 6.8 ms for one pass, 11.7 ms for two,
-17.3 ms for three. The picture it gives is not the danielblnc runtime's: the same mean correction
-(0.029 against 0.030) with a different structure, and a colour cast of its own: on that frame red
-moves by -0.029 and blue by +0.039 on average. Colour Strength at 0 keeps the game's hue and leaves
-+0.009, +0.005 and +0.003, the same as the OptiScaler fork's default for this runtime. In a game it
-has been tried in Euro Truck Simulator 2 (D3D11).
-
-## Better motion vectors (optional)
-
-The network takes four inputs: colour, depth, motion and exposure. Colour is always there. On a
-game that renders a velocity buffer, D3D11 hands the real one over. Everywhere else — every
-emulator, every game without one — the 64-bit add-on measures motion between two frames with
-AMD FidelityFX optical flow, in 8x8 blocks, and spreads each block's vector over its pixels along
-the depth, so an object's motion stays off its background. 32-bit games fall back to a cheaper
-block estimator.
-
-An optical-flow shader you already run can take over from it: `effects/AMD_Neural_Feed.fx` lets
-the add-on read one, and passes ReShade's depth buffer along with it.
-
-1. Install a motion-vector shader. **iMMERSE Launchpad** is the default and runs an eight-level
-   pyramid with a filter between every level: <https://martysmods.com>. VORT, LumeniteFX Kernel
-   and anything writing `texMotionVectors` also work — pick one with the `AMDNR_MV_PROVIDER`
-   preprocessor definition on the effect.
-2. Copy `AMD_Neural_Feed.fx` into your ReShade shaders folder.
-3. In ReShade's **Home** tab, tick both techniques, with the provider's **above**
-   `AMD Neural Feed`.
-
-Nothing of any provider is bundled here, and the effect includes no third-party files. It
-declares the provider's output texture exactly as the provider does, which is how ReShade binds
-the same one.
-
-The add-on's **Status** column reports what it ended up with, per frame, and the line is the
-whole story: a game's own vectors beat the effect, the effect beats the optical flow (the
-estimator on 32-bit games), and that beats nothing. `OpticalFlow=0` in `amd-nr.ini` goes back to
-the estimator on 64-bit games too. Turn the whole thing off with the checkbox there or `FeedEffect=0`.
-
-Optical flow is a guess, and it guesses confidently wrong wherever the picture changes without
-moving — a flickering light, a flame, a reflection. The effect reprojects every vector into the
-previous frame and checks it against depth, against the previous frame's vector, and against the
-hypothesis that nothing moved at all; one that fails is zeroed, which tells the network the
-surface is static. That is what stops history being warped in from somewhere it never was. The
-tests and their thresholds are in the effect's own settings.
+An optical-flow shader you already run can feed it instead: copy `effects/AMD_Neural_Feed.fx` into your ReShade
+shaders, and enable it below a provider such as iMMERSE Launchpad (<https://martysmods.com>), VORT or LumeniteFX. The
+**Status** column says which source is in use.
 
 ## Troubleshooting
 
-| What you see | What it means |
+| What you see | What to do |
 |---|---|
-| The add-on is not in the Add-ons tab | `ReShade.ini` has `DisabledAddons=` listing it under `[ADDON]`. ReShade writes that line if you ever untick the add-on. Delete the line. |
-| The status says the API is wrong | Only D3D10, D3D11, D3D12, Vulkan and OpenGL are supported, plus D3D8 and D3D9 in 32-bit games through the bridge. Check for a per-game renderer override. |
-| `HIP: amdhip64_7.dll failed to load` | HIP 7 is not installed. HIP 6 does not count. On RX 6000, install AMD's HIP SDK 7.2 and restart the game. |
-| `dlssnr_amd_pass1.dll is the size of a known build but not one … Refused.` (or `… bytes, the size of no danielblnc build this add-on knows …`) | A `dlssnr_amd_pass1.dll` that is none of the builds the log names. Compare with `tools/SHA256SUMS.txt`. |
-| `missing:` followed by a file path | That file is not where the add-on looks. Put it at exactly that path. |
-| The game crashes with `887A0005` | A Windows driver reset. Lower the Scale. |
-| `off: the GPU held one network job for … s` | One evaluation sat on the GPU for seconds. Seen on an RX 9060 XT with danielblnc's runtime, about every 10 to 30 minutes, and two close together locked the PC, so the effect switches off for the session at the first. Switch **NR runtime** to mochizuki (RDNA4). `StallStandDownMs` in `amd-nr.ini` sets the limit (2000 ms); `0` turns it off. |
-| `bridge: gave up on … (FenceWaitCapMs=10000 …)` in the log, and the status says to restart | The GPU did not finish the add-on's work in 10 s, so it switched off rather than free what the GPU may still read. Restart the game. `FenceWaitCapMs=0` in `amd-nr.ini` waits for ever instead, as older versions did. On 32-bit games the helper stops at 4 s whatever the key says, `0` included, so it answers before the game's own 5 s timeout; there the line reads `FenceWaitCapMs=4000` and is in `amd-nr-x86-host.log`. |
-| `Standing down:` after `the network outlasted InlineWaitMs on 8 evaluations in a row … at scale 0.25, the lowest`, or after `the network took … at scale 0.25, the lowest` | The network kept outlasting `InlineWaitMs` (or took over 250 ms) even at the lowest scale, so the effect switched off rather than hold the game's queue every frame or risk a driver reset. Above the lowest scale the same streak only holds the scale a step lower (`… so the scale is held at …`). Restart the game and lower the Scale; if it stands down at 0.25 again, lower the resolution. `WatchdogStandDown=0` in `amd-nr.ini` turns the watchdog rule off. |
-| `engine watchdog budget … WARNING` | `InlineWaitMs` in `dlssnr_on_amd.ini` is over the runtime's own 200 ms. The add-on never changes that file once it exists; lower the value by hand (the add-on writes 100 into a new one). |
-| The colours change but textures look the same | Try Scale 0.75 or 1.00 and compare the same scene. |
-| The log says `vulkan: present arrived on a non-graphics queue` | The game presents from an async queue. For DOOM Eternal set `r_presentFromAsync "0"`. |
+| The add-on isn't in the Add-ons tab | Delete the `DisabledAddons=` line under `[ADDON]` in `ReShade.ini`. |
+| `HIP: amdhip64_7.dll failed to load` | Install HIP 7. On RX 6000, install AMD's HIP SDK 7.2 and restart the game. |
+| `dlssnr_amd_pass1.dll ... Refused.` | That file is not a build the add-on knows. Compare it with `tools/SHA256SUMS.txt`. |
+| `missing:` and a path | Put that file at exactly that path. |
+| The game crashes with `887A0005` | The display driver reset. Lower the Scale. |
+| `off: the GPU held one network job for ... s` | danielblnc's runtime stalled. On RX 9000, switch NR runtime to mochizuki. |
 
-### Reporting a problem
-
-Screenshots rarely help, because flicker is frames alternating and a still image looks fine.
-
-Two things are needed:
-
-1. **The status line** in the panel. It reads `N frames, Z% skipped`. Copy that line.
-2. **The logs**, both next to the game's `.exe`:
-   - `amd-nr.log` — what the add-on detected and what it measured.
-   - `dlssnr_on_amd.log` — what the runtime did.
-
-If the problem is the installer rather than the add-on, use its own **Report a problem** button. It
-collects everything into one `.zip` and opens the folder. Nothing is sent anywhere.
+To report a problem, send the panel's status line (`N frames, Z% skipped`) and both logs next to the game's `.exe`:
+`amd-nr.log` and `dlssnr_on_amd.log`. Screenshots rarely help with flicker. For installer problems, use its
+**Report a problem** button.
 
 ## Building
 
-You do not need to build anything to use this. If you want to:
+You don't need to build anything to use this.
 
 ```powershell
 .\build.ps1 -Target neural       # amd-nr.addon64
 .\build-x86bridge.ps1            # amd-nr.addon32 and amd-nr-host64.exe, for 32-bit games
 ```
 
-You need Visual Studio with the C++ tools and the Windows SDK. The ReShade and Dear ImGui headers
-are already in `3rdparty/`.
-
-`.\tools\gates.ps1 -All` builds every target and runs every check in `tools/` and
-`core/x86bridge/tests/`, one line each; a few compile one function on its own and need a MinGW g++
-(MSYS2's UCRT64 one is found at its usual place). CI runs the ones that need no GPU and no runtime.
-
-The code is laid out by layer. `core/addon/` is the add-on and the network calls, and every
-graphics API reaches it through one transport of its own in `core/transport/` (`d3d11`, `d3d12`,
-`vulkan`, `opengl`). `core/x86bridge/` is the 32-bit pair, `core/ui/` the panel both routes draw,
-`core/shaders/` the compute shaders, and `core/diagnostics/` the harnesses that test a build without
-a game.
+Needs Visual Studio with the C++ tools and the Windows SDK. The ReShade and Dear ImGui headers are in `3rdparty/`.
+`.\tools\gates.ps1 -All` builds every target and runs the checks.
 
 ## Limits
 
-- D3D11 is the only route where the game's own motion vectors reach the network, and the only one
-  where the companion effect above can stand in for them. On D3D12 the add-on finds the game's
-  depth, captured before the game clears it, and measures motion by optical flow. On D3D10, Vulkan and OpenGL,
-  and on 32-bit D3D9 games, it only receives the final image. The panel leaves out the guide controls a
-  route cannot use, and the log's `route:` line says what it reaches.
-- FSR upscaling is not implemented and is not planned.
-- On 32-bit D3D9 without D3D9Ex, each frame crosses system memory twice. That costs a few
-  milliseconds per frame regardless of the Scale.
-- This is tested by one person on one card.
+- Only D3D11 passes the game's own motion vectors. D3D12 gets the game's depth and optical flow; D3D10, Vulkan, OpenGL
+  and 32-bit D3D9 get the final image only.
+- No FSR upscaling, and none planned.
+- Tested by one person on one card (RX 9070 XT).
 
-## Support this project
-
-This is one person, one graphics card, and evenings. There is no company behind it and nothing
-here is sponsored. Every measurement in this README came from a single RX 9070 XT, which is why
-"tested on one card" appears as often as it does.
+## Support
 
 [![Support this project on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T6T213OVFE)
 
-**[ko-fi.com/T6T213OVFE](https://ko-fi.com/T6T213OVFE)**
-
-What it pays for, in order:
-
-- **Research tokens.** Decompiling a closed runtime and chasing one field through a binary is
-  metered work. This is the main thing deciding whether the next question gets answered.
-- **Other hardware.** Everything is verified on one RDNA4 card. RDNA3 is untested.
-- **Time.** Most of the useful work produces one number rather than a feature.
-- **Games to test.** Adding a game to the list means owning it and playing it.
-
-Nothing is gated behind a donation. The code is MIT either way.
+Nothing is locked behind a donation. The code is MIT either way.
 
 ## Credits
 
-This project is downstream of
-**[DLSS-NR-on-AMD](https://github.com/danielblnc/DLSS-NR-on-AMD)** by **danielblnc**. That project
-produces the runtime and the weights, which is everything the network needs to run. Neither is
-reimplemented or redistributed here. This repository adds the ReShade add-on around it: the D3D11,
-D3D12, Vulkan and OpenGL routes, the 32-bit bridge, the guide capture and the overlay.
-
-It has its own terms. The MIT licence below covers only the code in this repository.
-
-The optional mochizuki runtime is **[DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD)** by
-**mochizuki0323** (MIT), built as `MochizukiNrRuntime.dll` by the OptiScaler AMD NR fork. The add-on
-loads it and ships none of it.
-
-Thanks to everyone who ran a build and sent back a log.
+- [DLSS-NR-on-AMD](https://github.com/danielblnc/DLSS-NR-on-AMD) by danielblnc: the runtime and weights this add-on
+  drives. Neither is reimplemented or redistributed here, and they have their own terms.
+- [DLSSNR-AMD](https://gitlab.com/mochizuki0323/DLSSNR-AMD) by mochizuki0323 (MIT): the optional Vulkan runtime. The
+  add-on loads it and ships none of it.
+- `core/temporal/smooth.inc` and `core/temporal/motion_feed.inc` port shaders from lmxxf's
+  [dlss5-on-amd-9070xt-porting](https://github.com/lmxxf/dlss5-on-amd-9070xt-porting) (MIT), notice in
+  `docs/third-party/lmxxf-LICENSE.md`.
+- Thanks to everyone who ran a build and sent back a log.
 
 ## License
 
-MIT, in `LICENSE`. Third-party headers in `3rdparty/` keep their own licences, listed in
-`3rdparty/reshade/NOTICE.md`. `core/temporal/smooth.inc` and `core/temporal/motion_feed.inc` port
-shaders from lmxxf's dlss5-on-amd-9070xt-porting (MIT, Copyright (c) 2026 Kien), whose notice is in
-`docs/third-party/lmxxf-LICENSE.md`.
+MIT, see `LICENSE`. Headers in `3rdparty/` keep their own licences, listed in `3rdparty/reshade/NOTICE.md`.
